@@ -1,0 +1,26 @@
+# Copia a terraform.tfvars y ajusta según el escenario.
+
+aws_region  = "us-east-1"
+name_prefix = "breb-poc"
+
+# --- Queue-Based Load Leveling ---
+reserved_concurrency       = 20   # N: límite de solicitudes paralelas al backend
+sqs_batch_size             = 10
+max_receive_count          = 5
+visibility_timeout_seconds = 60
+
+# --- Consumidor ---
+consumer_timeout_seconds = 30
+consumer_memory_mb       = 256
+max_retries              = 3
+
+# --- Stub backend ---
+# Escenario "normal"/"estrés": stub_error_rate = 0.0
+# Escenario "fallo transitorio": stub_error_rate = 0.05  (5%)
+stub_error_rate     = 0.05
+stub_latency_min_ms = 50
+stub_latency_max_ms = 300
+
+# --- Scheduler (opcional) ---
+enable_scheduler    = false
+schedule_expression = "cron(0 6 * * ? *)"
