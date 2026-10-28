@@ -18,14 +18,13 @@ que este consumidor golpea el backend, protegiéndolo del pico de las 6:00 a.m.
 import json
 import os
 import time
-import urllib.request
-import urllib.error
 
 import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
 from botocore.auth import SigV4Auth
 from botocore.awsrequest import AWSRequest
+from botocore.httpsession import URLLib3Session
 from urllib.parse import urlparse
 
 # ---------------------------------------------------------------------------
@@ -47,6 +46,9 @@ _table = _ddb.Table(IDEMPOTENCY_TABLE)
 _session = boto3.session.Session()
 _region = _session.region_name or os.environ.get("AWS_REGION", "us-east-2")
 _backend_host = urlparse(BACKEND_URL).netloc
+# Cliente HTTP de botocore: firma y envío usan EXACTAMENTE los mismos headers,
+# evitando que un cliente externo (urllib) altere headers y rompa la firma SigV4.
+_http = URLLib3Session(timeout=BACKEND_TIMEOUT_SECONDS)
 
 
 class PermanentError(Exception):
@@ -112,47 +114,38 @@ def _call_backend(payload: dict) -> None:
     last_err = None
     for attempt in range(1, MAX_RETRIES + 1):
         # Firma SigV4 para la Function URL (servicio "lambda"). Las credenciales
-        # provienen del rol de ejecución de la Lambda consumer.
+        # provienen del rol de ejecución de la Lambda consumer. El mismo AWSRequest
+        # firmado se envía con el cliente de botocore para que los headers no cambien.
         aws_request = AWSRequest(
             method="POST",
             url=BACKEND_URL,
             data=data,
             headers={
                 "Content-Type": "application/json",
-                "Host": _backend_host,
                 "X-Idempotency-Key": payload["payment_id"],
             },
         )
-        credentials = _session.get_credentials()
+        credentials = _session.get_credentials().get_frozen_credentials()
         SigV4Auth(credentials, "lambda", _region).add_auth(aws_request)
 
-        req = urllib.request.Request(
-            BACKEND_URL,
-            data=data,
-            headers=dict(aws_request.headers),
-            method="POST",
-        )
         try:
-            with urllib.request.urlopen(req, timeout=BACKEND_TIMEOUT_SECONDS) as resp:
-                if 200 <= resp.status < 300:
-                    return
-                last_err = f"HTTP {resp.status}"
-        except urllib.error.HTTPError as exc:
-            last_err = f"HTTP {exc.code}"
-            try:
-                err_body = exc.read().decode("utf-8", "replace")[:500]
-            except Exception:
-                err_body = "<sin cuerpo>"
+            resp = _http.send(aws_request.prepare())
+            if 200 <= resp.status_code < 300:
+                return
+            last_err = f"HTTP {resp.status_code}"
+            body_txt = (resp.text or "")[:500] if hasattr(resp, "text") else ""
             print(json.dumps({
                 "event": "backend_http_error",
                 "payment_id": payload["payment_id"],
-                "code": exc.code,
-                "body": err_body,
+                "code": resp.status_code,
+                "body": body_txt,
             }))
             # 4xx (excepto 429) es error de datos: no reintentar.
-            if 400 <= exc.code < 500 and exc.code != 429:
-                raise PermanentError(f"backend rechazó el pago: {last_err}") from exc
-        except (urllib.error.URLError, TimeoutError) as exc:
+            if 400 <= resp.status_code < 500 and resp.status_code != 429:
+                raise PermanentError(f"backend rechazó el pago: {last_err}")
+        except PermanentError:
+            raise
+        except Exception as exc:  # errores de red/timeout → reintentar
             last_err = str(exc)
 
         if attempt < MAX_RETRIES:
