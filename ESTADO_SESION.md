@@ -184,6 +184,61 @@ Y el dashboard: breb-poc-dashboard (ver cola subir/bajar y DLQ en 0).
 OJO espacio CloudShell: home al 92%. Si "No space left on device" al git pull:
 `git -C ~/ArquitecturaCloudPoc gc --aggressive --prune=now` para recuperar espacio.
 
+## DÓNDE VAMOS EXACTAMENTE (2026-10-28 ~01:30) — CARGA NORMAL VALIDADA ✅
+
+Resumen para retomar: la PoC está DESPLEGADA, el bug del 403 RESUELTO (invoke API
+de Lambda), la carga se inyecta con `load/load_cli.sh` (k6 descartado), y el
+escenario NORMAL ya pasó. Todo el código y docs están en GitHub (último trabajo
+en `main`). El state de Terraform vive en CloudShell (~/ArquitecturaCloudPoc/terraform).
+
+### Resultado escenario NORMAL (100 msg) — VERIFICADO
+- `./load_cli.sh 100 normal` → 100 mensajes enviados en 15s.
+- Logs consumer: **100 "processed"** (grep -c = 100). 0 fallos.
+- Cola principal: ApproximateNumberOfMessages=0, NotVisible=0 (todo drenado). ✅
+- => ASR-1 (desacople/drenado) y ASR-2 (0 pérdidas) OK en caso normal.
+
+### IMPORTANTE sobre la DLQ (no confundir)
+- `breb-poc-dlq` mostró **502 mensajes**, pero NO son del escenario normal.
+  Son BASURA HISTÓRICA de los intentos del bug del 403 (demo-iam-*, demo-*, pay-*
+  viejos) que agotaron maxReceiveCount=5 y cayeron a la DLQ antes del fix.
+- Acción pendiente: PURGAR la DLQ para limpiar métricas y la alarma dlq-not-empty:
+  ```bash
+  aws sqs purge-queue --region us-east-2 \
+    --queue-url "$(cd ~/ArquitecturaCloudPoc/terraform && terraform output -raw dlq_url)"
+  ```
+
+### EN CURSO / PRÓXIMO PASO
+- Se lanzó `./load_cli.sh 2000 normal` (corrida completa). Falta ver su resultado.
+  Al terminar ("Enviados 2000 mensajes en Ns"):
+  ```bash
+  sleep 60
+  aws logs tail /aws/lambda/breb-poc-consumer --region us-east-2 --since 10m --format short | grep -c '"event": "processed"'
+  aws sqs get-queue-attributes --region us-east-2 \
+    --queue-url "$(cd ~/ArquitecturaCloudPoc/terraform && terraform output -raw queue_url)" \
+    --attribute-names ApproximateNumberOfMessages ApproximateNumberOfMessagesNotVisible
+  ```
+  Esperado: ~2000 processed, cola en 0.
+- Abrir dashboard (navegador) para evidenciar Queue-Based Load Leveling:
+  https://us-east-2.console.aws.amazon.com/cloudwatch/home?region=us-east-2#dashboards:name=breb-poc-dashboard
+  (la cola sube con la inyección y baja al drenar; con concurrencia total=10 el
+  dosificado es muy visible).
+
+### DESPUÉS (escenarios restantes)
+1. PURGAR la DLQ (ver arriba) ANTES de medir, para partir limpio.
+2. `./load_cli.sh 6000 stress`  → pico; verificar 0 pérdidas y backlog drenado.
+3. `./load_cli.sh 2000 fault 25` → fallo+duplicados; demostrar:
+   - reintentos con backoff y algunos mensajes a la DLQ (por el 5% de error del stub),
+   - 0 duplicados: los payment_id repetidos salen como "duplicate_skipped" en logs
+     y en DynamoDB cada payment_key aparece una sola vez con status DONE.
+4. Capturas del dashboard + conteos para la evidencia de la entrega.
+
+### Artefactos clave en el repo (GitHub)
+- BreB_PoC_AWS.drawio / .png  — diagrama con íconos AWS, ordenado, fecha 2026-10-28.
+- GUIA_CONSOLA_AWS.md         — cómo demostrar la PoC por la consola web (links us-east-2).
+- load/load_cli.sh           — generador de carga por AWS CLI (normal/stress/fault).
+- ESTADO_SESION.md           — este archivo (handoff).
+- terraform/ + lambda/       — infra y código (consumer invoca stub por lambda:InvokeFunction).
+
 ### Después de verificar (pendientes)
 
 1. (Opcional) Purgar la cola antes de la prueba de carga — hay mensajes viejos
