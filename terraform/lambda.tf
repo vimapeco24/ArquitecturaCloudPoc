@@ -58,7 +58,10 @@ resource "aws_lambda_function" "consumer" {
   memory_size   = var.consumer_memory_mb
 
   # Concurrencia reservada N — corazón del Queue-Based Load Leveling.
-  reserved_concurrent_executions = var.reserved_concurrency
+  # Si es 0, se usa -1 (sin reserva): necesario en cuentas sandbox cuyo límite
+  # total de concurrencia es 10 y no permiten reservar. El dosificado se mantiene
+  # vía scaling_config.maximum_concurrency del event source mapping.
+  reserved_concurrent_executions = var.reserved_concurrency > 0 ? var.reserved_concurrency : -1
 
   tracing_config {
     mode = "Active" # X-Ray
@@ -82,7 +85,9 @@ resource "aws_lambda_event_source_mapping" "sqs_to_consumer" {
   function_response_types            = ["ReportBatchItemFailures"]
 
   scaling_config {
-    # No sobrepasar la concurrencia reservada con pollers de SQS.
-    maximum_concurrency = var.reserved_concurrency
+    # Dosifica el nº de invocaciones concurrentes que SQS dispara (mín. permitido=2).
+    # Este es el control efectivo de Queue-Based Load Leveling cuando la cuenta no
+    # permite reservar concurrencia a nivel de función.
+    maximum_concurrency = var.reserved_concurrency >= 2 ? var.reserved_concurrency : 2
   }
 }
