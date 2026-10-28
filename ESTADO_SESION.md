@@ -139,6 +139,51 @@ volver a correr el `eval` para refrescarlas.
 
 Tras la carga: ver CloudWatch dashboard (cola llenándose/drenando), DLQ en 0.
 
+## k6 DESCARTADO — usar load/load_cli.sh (AWS CLI) 2026-10-28 ~01:40
+
+Se intentó 4 veces correr k6; SIEMPRE falla con "invalid AWS access key ID ...
+undefined" en buildClient (producer.js:8), AUNQUE:
+- las credenciales están completas (AKID len=20, SECRET len=40, TOKEN len=1236),
+- se pasan con -e explícito,
+- se cargan desde /tmp/awscreds.env con source.
+=> No es problema de credenciales ni de entorno. Es un bug/incompatibilidad de la
+jslib de AWS para k6 (https://jslib.k6.io/aws/0.12.3/sqs.js) en este runtime: el
+constructor new AWSConfig({...}) rechaza las credenciales.
+
+DECISIÓN (cambio de enfoque, no seguir con k6): inyectar la carga con el AWS CLI.
+Nuevo script en el repo: **load/load_cli.sh** (usa send-message-batch, 10 msg por
+llamada, en paralelo; el CLI resuelve solo las credenciales de CloudShell).
+
+### Cómo correr la carga (CloudShell) — SIN k6
+
+```bash
+cd ~/ArquitecturaCloudPoc && git pull
+cd load
+# prueba rápida
+./load_cli.sh 100 normal
+# escenario NORMAL completo
+./load_cli.sh 2000 normal
+# ESTRÉS (pico)
+./load_cli.sh 6000 stress
+# FALLO + duplicados (valida reintentos/DLQ e idempotencia ASR-2)
+./load_cli.sh 2000 fault 25
+```
+
+Observar en paralelo (otra pestaña del CloudShell o tras lanzar):
+```bash
+# profundidad de la cola (buffering de Queue-Based Load Leveling)
+watch -n2 'aws sqs get-queue-attributes --region us-east-2 \
+  --queue-url $(cd ~/ArquitecturaCloudPoc/terraform && terraform output -raw queue_url) \
+  --attribute-names ApproximateNumberOfMessages ApproximateNumberOfMessagesNotVisible'
+# logs del consumer
+aws logs tail /aws/lambda/breb-poc-consumer --region us-east-2 --since 5m --follow
+```
+
+Y el dashboard: breb-poc-dashboard (ver cola subir/bajar y DLQ en 0).
+
+OJO espacio CloudShell: home al 92%. Si "No space left on device" al git pull:
+`git -C ~/ArquitecturaCloudPoc gc --aggressive --prune=now` para recuperar espacio.
+
 ### Después de verificar (pendientes)
 
 1. (Opcional) Purgar la cola antes de la prueba de carga — hay mensajes viejos
