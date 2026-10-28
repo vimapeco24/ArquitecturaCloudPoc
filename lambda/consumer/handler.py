@@ -139,6 +139,16 @@ def _call_backend(payload: dict) -> None:
                 last_err = f"HTTP {resp.status}"
         except urllib.error.HTTPError as exc:
             last_err = f"HTTP {exc.code}"
+            try:
+                err_body = exc.read().decode("utf-8", "replace")[:500]
+            except Exception:
+                err_body = "<sin cuerpo>"
+            print(json.dumps({
+                "event": "backend_http_error",
+                "payment_id": payload["payment_id"],
+                "code": exc.code,
+                "body": err_body,
+            }))
             # 4xx (excepto 429) es error de datos: no reintentar.
             if 400 <= exc.code < 500 and exc.code != 429:
                 raise PermanentError(f"backend rechazó el pago: {last_err}") from exc
