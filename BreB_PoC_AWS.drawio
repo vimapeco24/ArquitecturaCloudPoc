@@ -1,6 +1,6 @@
 <mxfile host="app.diagrams.net" agent="Kiro" version="24.0.0">
   <diagram name="PoC AWS" id="poc-aws">
-    <mxGraphModel dx="1600" dy="960" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="780" math="0" shadow="0">
+    <mxGraphModel dx="1600" dy="960" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0">
       <root>
         <mxCell id="0"/>
         <mxCell id="1" parent="0"/>
@@ -9,46 +9,50 @@
 
         <mxCell id="fecha" value="Actualizado: 2026-10-28 · Cuenta aftc_test (803647807230) · Región us-east-2 (Ohio) · Estado: DESPLEGADO y VERIFICADO end-to-end" style="text;html=1;align=center;fontSize=11;fontStyle=2;fontColor=#555555;" vertex="1" parent="1"><mxGeometry x="200" y="50" width="1200" height="20" as="geometry"/></mxCell>
 
-        <!-- Generador de carga -->
-        <mxCell id="load" value="Generador de carga&#10;k6 (SendMessage, SigV4)&#10;Normal 2.000 · Estrés 6.000 · Fallo +duplicados" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="40" y="290" width="210" height="100" as="geometry"/></mxCell>
+        <!-- ===== Nube AWS (grupo) ===== -->
+        <mxCell id="awsCloud" value="AWS Cloud · us-east-2 (Ohio)" style="points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];outlineConnect=0;gradientColor=none;html=1;whiteSpace=wrap;fontSize=12;fontStyle=0;container=0;pointerEvents=0;collapsible=0;recursiveResize=0;shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_aws_cloud_alt;strokeColor=#232F3E;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontColor=#232F3E;dashed=0;" vertex="1" parent="1"><mxGeometry x="300" y="90" width="1080" height="520" as="geometry"/></mxCell>
 
-        <!-- Límite entorno AWS -->
-        <mxCell id="aws" value="Entorno de PoC en AWS (us-east-2 · Ohio)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#ED7100;dashed=1;verticalAlign=top;fontStyle=1;fontColor=#232F3E;" vertex="1" parent="1"><mxGeometry x="300" y="90" width="1060" height="470" as="geometry"/></mxCell>
+        <!-- ===== Generador de carga (fuera de la nube) ===== -->
+        <mxCell id="loadIcon" value="k6&#10;(generador de carga)" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#E7157B;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.distributed_load_testing;" vertex="1" parent="1"><mxGeometry x="90" y="300" width="78" height="78" as="geometry"/></mxCell>
+        <mxCell id="loadTxt" value="Normal 2.000 · Estrés 6.000 · Fallo +duplicados&#10;SendMessage a SQS (SigV4)" style="text;html=1;align=center;fontSize=10;fontColor=#555555;" vertex="1" parent="1"><mxGeometry x="30" y="390" width="200" height="34" as="geometry"/></mxCell>
 
-        <!-- EventBridge Scheduler -->
-        <mxCell id="sch" value="Amazon EventBridge Scheduler&#10;(opcional, enable_scheduler=false en la PoC&#10;— dispararía el lote simulando 6:00 a.m.)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#ED7100;fontColor=#232F3E;dashed=1;" vertex="1" parent="1"><mxGeometry x="330" y="130" width="280" height="70" as="geometry"/></mxCell>
+        <!-- ===== EventBridge Scheduler ===== -->
+        <mxCell id="schIcon" value="EventBridge Scheduler&#10;(opcional, deshabilitado)" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#E7157B;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.eventbridge_scheduler;" vertex="1" parent="1"><mxGeometry x="360" y="140" width="78" height="78" as="geometry"/></mxCell>
 
-        <!-- SQS -->
-        <mxCell id="sqs" value="Amazon SQS&#10;(cola principal: breb-poc-queue)&#10;Queue-Based Load Leveling" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E7157B;strokeColor=none;fontColor=#ffffff;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="340" y="280" width="230" height="80" as="geometry"/></mxCell>
+        <!-- ===== SQS cola principal ===== -->
+        <mxCell id="sqsIcon" value="Amazon SQS&#10;breb-poc-queue&#10;Queue-Based Load Leveling" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#E7157B;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.simple_queue_service;" vertex="1" parent="1"><mxGeometry x="400" y="320" width="78" height="78" as="geometry"/></mxCell>
 
-        <!-- Lambda consumidor -->
-        <mxCell id="lam" value="AWS Lambda — consumidor (breb-poc-consumer)&#10;Dosificado por maximum_concurrency=2&#10;del event source mapping (cuenta sandbox:&#10;límite total de 10 ejecuciones)&#10;Idempotencia + backoff + ReportBatchItemFailures" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ED7100;strokeColor=none;fontColor=#ffffff;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="650" y="265" width="270" height="110" as="geometry"/></mxCell>
+        <!-- ===== Lambda consumer ===== -->
+        <mxCell id="lamIcon" value="AWS Lambda — consumer&#10;breb-poc-consumer&#10;dosificado maximum_concurrency=2&#10;idempotencia + backoff + ReportBatchItemFailures" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#ED7100;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;" vertex="1" parent="1"><mxGeometry x="700" y="320" width="78" height="78" as="geometry"/></mxCell>
 
-        <!-- Stub backend -->
-        <mxCell id="stub" value="Stub Backend Transaccional&#10;AWS Lambda (breb-poc-stub-backend)&#10;Invocado por API de Lambda (invoke)&#10;latencia simulada + 5% errores transitorios" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ED7100;strokeColor=none;fontColor=#ffffff;" vertex="1" parent="1"><mxGeometry x="990" y="130" width="250" height="100" as="geometry"/></mxCell>
+        <!-- ===== Lambda stub backend ===== -->
+        <mxCell id="stubIcon" value="AWS Lambda — stub backend&#10;breb-poc-stub-backend&#10;invocado por API de Lambda (invoke)&#10;latencia simulada + 5% error transitorio" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#ED7100;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;" vertex="1" parent="1"><mxGeometry x="1050" y="150" width="78" height="78" as="geometry"/></mxCell>
 
-        <!-- DynamoDB idempotencia -->
-        <mxCell id="ddb" value="Amazon DynamoDB&#10;tabla de idempotencia (breb-poc-idempotency)&#10;PutItem condicional → 0 duplicados&#10;status PROCESSING/DONE + TTL" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#2E27AD;strokeColor=none;fontColor=#ffffff;boundedLbl=1;backgroundOutline=1;size=14;" vertex="1" parent="1"><mxGeometry x="1000" y="290" width="220" height="100" as="geometry"/></mxCell>
+        <!-- ===== DynamoDB ===== -->
+        <mxCell id="ddbIcon" value="Amazon DynamoDB&#10;breb-poc-idempotency&#10;PutItem condicional → 0 duplicados&#10;status PROCESSING/DONE + TTL" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#2E27AD;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.dynamodb;" vertex="1" parent="1"><mxGeometry x="1050" y="340" width="78" height="78" as="geometry"/></mxCell>
 
-        <!-- DLQ -->
-        <mxCell id="dlq" value="Amazon SQS — DLQ (breb-poc-dlq)&#10;mensajes no procesables&#10;tras maxReceiveCount=5" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1"><mxGeometry x="340" y="430" width="230" height="70" as="geometry"/></mxCell>
+        <!-- ===== SQS DLQ ===== -->
+        <mxCell id="dlqIcon" value="Amazon SQS — DLQ&#10;breb-poc-dlq&#10;no procesables tras maxReceiveCount=5" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#E7157B;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.simple_queue_service;" vertex="1" parent="1"><mxGeometry x="400" y="480" width="78" height="78" as="geometry"/></mxCell>
 
-        <!-- Observabilidad -->
-        <mxCell id="obs" value="Observabilidad:  Amazon CloudWatch (dashboard breb-poc-dashboard · profundidad de cola · errores · DLQ)  +  AWS X-Ray (trazas E2E)  +  2 Alarmas (errores del consumer · DLQ no vacía)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#759C3E;strokeColor=none;fontColor=#ffffff;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="40" y="600" width="1320" height="50" as="geometry"/></mxCell>
+        <!-- ===== CloudWatch ===== -->
+        <mxCell id="cwIcon" value="Amazon CloudWatch&#10;dashboard + 2 alarmas" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#E7157B;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.cloudwatch_2;" vertex="1" parent="1"><mxGeometry x="700" y="490" width="78" height="78" as="geometry"/></mxCell>
 
-        <!-- Criterios -->
-        <mxCell id="crit" value="Criterios de éxito:  ≥ 10 TPS sostenido   ·   ≥ 99% procesado en ≤ 60 min   ·   p95 ≤ 2 s   ·   error rate &lt; 1%   ·   0 mensajes perdidos   ·   0 pagos duplicados" style="text;html=1;align=center;fontStyle=2;fontColor=#2d6a2d;fontSize=12;" vertex="1" parent="1"><mxGeometry x="200" y="668" width="1200" height="24" as="geometry"/></mxCell>
+        <!-- ===== X-Ray ===== -->
+        <mxCell id="xrayIcon" value="AWS X-Ray&#10;trazas E2E" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#E7157B;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.xray;" vertex="1" parent="1"><mxGeometry x="880" y="490" width="78" height="78" as="geometry"/></mxCell>
 
-        <!-- Nota de diseño -->
-        <mxCell id="nota" value="Nota de diseño: la organización de la cuenta bloquea las Lambda Function URLs (403). Por eso el consumer invoca el stub por la API de Lambda (lambda:InvokeFunction), no por HTTP." style="text;html=1;align=center;fontStyle=2;fontColor=#8a4b00;fontSize=11;" vertex="1" parent="1"><mxGeometry x="200" y="698" width="1200" height="30" as="geometry"/></mxCell>
+        <!-- ===== Flechas ===== -->
+        <mxCell id="e1" value="inyecta carga (SendMessage)" style="endArrow=classic;html=1;fontColor=#555555;rounded=0;" edge="1" parent="1" source="loadIcon" target="sqsIcon"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" value="dispara lote (deshabilitado)" style="endArrow=classic;html=1;dashed=1;fontColor=#999999;" edge="1" parent="1" source="schIcon" target="sqsIcon"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" value="consumo dosificado (max_concurrency=2)" style="endArrow=classic;html=1;fontColor=#555555;" edge="1" parent="1" source="sqsIcon" target="lamIcon"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" value="ejecuta transferencia (lambda:InvokeFunction)" style="endArrow=classic;html=1;fontColor=#555555;" edge="1" parent="1" source="lamIcon" target="stubIcon"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e5" value="reserva clave idempotencia" style="endArrow=classic;html=1;fontColor=#555555;" edge="1" parent="1" source="lamIcon" target="ddbIcon"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e6" value="reintentos agotados (maxReceiveCount=5)" style="endArrow=classic;html=1;dashed=1;strokeColor=#b85450;fontColor=#b85450;" edge="1" parent="1" source="sqsIcon" target="dlqIcon"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e7" value="métricas/logs" style="endArrow=none;html=1;dashed=1;strokeColor=#759C3E;fontColor=#759C3E;" edge="1" parent="1" source="lamIcon" target="cwIcon"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e8" value="trazas" style="endArrow=none;html=1;dashed=1;strokeColor=#759C3E;fontColor=#759C3E;" edge="1" parent="1" source="lamIcon" target="xrayIcon"><mxGeometry relative="1" as="geometry"/></mxCell>
 
-        <!-- Flechas -->
-        <mxCell id="e1" value="inyecta carga (SQS SendMessage)" style="endArrow=classic;html=1;fontColor=#555555;" edge="1" parent="1" source="load" target="sqs"><mxGeometry relative="1" as="geometry"/></mxCell>
-        <mxCell id="e2" value="dispara lote (deshabilitado)" style="endArrow=classic;html=1;dashed=1;fontColor=#999999;" edge="1" parent="1" source="sch" target="sqs"><mxGeometry relative="1" as="geometry"/></mxCell>
-        <mxCell id="e3" value="consumo dosificado (max_concurrency=2)" style="endArrow=classic;html=1;fontColor=#555555;" edge="1" parent="1" source="sqs" target="lam"><mxGeometry relative="1" as="geometry"/></mxCell>
-        <mxCell id="e4" value="ejecuta transferencia (lambda:InvokeFunction)" style="endArrow=classic;html=1;fontColor=#555555;" edge="1" parent="1" source="lam" target="stub"><mxGeometry relative="1" as="geometry"/></mxCell>
-        <mxCell id="e5" value="reserva clave idempotencia" style="endArrow=classic;html=1;fontColor=#555555;" edge="1" parent="1" source="lam" target="ddb"><mxGeometry relative="1" as="geometry"/></mxCell>
-        <mxCell id="e6" value="reintentos agotados (maxReceiveCount=5)" style="endArrow=classic;html=1;dashed=1;strokeColor=#b85450;fontColor=#b85450;" edge="1" parent="1" source="sqs" target="dlq"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <!-- ===== Criterios y nota ===== -->
+        <mxCell id="crit" value="Criterios de éxito:  ≥ 10 TPS sostenido   ·   ≥ 99% procesado en ≤ 60 min   ·   p95 ≤ 2 s   ·   error rate &lt; 1%   ·   0 mensajes perdidos   ·   0 pagos duplicados" style="text;html=1;align=center;fontStyle=2;fontColor=#2d6a2d;fontSize=12;" vertex="1" parent="1"><mxGeometry x="200" y="640" width="1200" height="24" as="geometry"/></mxCell>
+        <mxCell id="nota" value="Nota de diseño: la organización de la cuenta bloquea las Lambda Function URLs (403). Por eso el consumer invoca el stub por la API de Lambda (lambda:InvokeFunction), no por HTTP." style="text;html=1;align=center;fontStyle=2;fontColor=#8a4b00;fontSize=11;" vertex="1" parent="1"><mxGeometry x="200" y="668" width="1200" height="30" as="geometry"/></mxCell>
       </root>
     </mxGraphModel>
   </diagram>

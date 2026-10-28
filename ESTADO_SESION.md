@@ -101,6 +101,44 @@ Al preparar k6 aparecieron dos problemas en CloudShell:
 Tras liberar espacio y exportar credenciales (ver Key=ASIA... Token set? yes),
 reintentar: `export QUEUE_URL=...; cd ~/ArquitecturaCloudPoc/load; TOTAL=100 k6 run normal.js`
 
+## DÓNDE VAMOS EXACTAMENTE (2026-10-28 ~01:30)
+
+Estado: PoC desplegada y VERIFICADA end-to-end (processed + DynamoDB DONE). ✅
+Diagrama rehecho con ÍCONOS OFICIALES de AWS (shapes mxgraph.aws4) + PNG regenerado.
+Guía de consola web creada. Todo en GitHub.
+
+Tarea en curso: correr pruebas de carga k6 desde CloudShell. Pasos ya resueltos:
+- k6 instalado en ~/bin/k6 (v0.49.0). OK.
+- Espacio: home al 92% (ArquitecturaCloudPoc pesa 693M, sobre todo .git/.terraform).
+  No bloquea k6. Limpieza opcional: `git gc --aggressive --prune=now`.
+- Credenciales: obtenerlas SOLO con `eval "$(aws configure export-credentials --format env)"`.
+  NO usar el fallback de jq/python (devuelve vacío y las pisa).
+
+PROBLEMA ACTUAL: aunque las vars están exportadas (AKID=ASIA3W SECRET? yes TOKEN? yes),
+k6 sigue diciendo "invalid AWS access key ID ... undefined". Causa: k6 no copia el
+entorno a __ENV de forma fiable. SOLUCIÓN: pasar las credenciales con -e explícito:
+
+```bash
+export AWS_REGION=us-east-2
+eval "$(aws configure export-credentials --format env)"
+export QUEUE_URL=$(cd ~/ArquitecturaCloudPoc/terraform && terraform output -raw queue_url)
+cd ~/ArquitecturaCloudPoc/load
+k6 run \
+  -e AWS_REGION=us-east-2 \
+  -e AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" \
+  -e AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
+  -e AWS_SESSION_TOKEN="$AWS_SESSION_TOKEN" \
+  -e QUEUE_URL="$QUEUE_URL" \
+  -e TOTAL=100 \
+  normal.js
+```
+
+Si TOTAL=100 entra bien → repetir con -e TOTAL=2000 (corrida completa).
+NOTA: las credenciales de CloudShell CADUCAN; si tras un rato k6 da 403/expired,
+volver a correr el `eval` para refrescarlas.
+
+Tras la carga: ver CloudWatch dashboard (cola llenándose/drenando), DLQ en 0.
+
 ### Después de verificar (pendientes)
 
 1. (Opcional) Purgar la cola antes de la prueba de carga — hay mensajes viejos
