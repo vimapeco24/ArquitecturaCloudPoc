@@ -75,6 +75,32 @@ o AWS_IAM). Confirmado porque `aws lambda invoke` directo al stub SÍ funciona
 PoC FUNCIONANDO end-to-end. Siguiente: **pruebas de carga k6** para demostrar
 Queue-Based Load Leveling. Ver sección "Pruebas de carga" abajo.
 
+## Artefactos de la sesión 2026-10-28 (post-fix)
+
+- `BreB_PoC_AWS.drawio` — diagrama ACTUALIZADO a la realidad desplegada:
+  región us-east-2, invoke por API de Lambda (no Function URL), dosificado
+  maximum_concurrency=2, scheduler deshabilitado. Con fecha 2026-10-28.
+- `BreB_PoC_AWS.png` — imagen exportada del diagrama (para presentación).
+- `GUIA_CONSOLA_AWS.md` — guía paso a paso para mostrar la PoC desde la CONSOLA
+  WEB de AWS (no CLI): dashboard, SQS, Lambda+logs, DynamoDB, X-Ray, alarmas,
+  con links directos a us-east-2 y guion de demo.
+
+## BLOQUEO ACTUAL — pruebas de carga k6 en CloudShell (2026-10-28 ~01:20)
+
+Al preparar k6 aparecieron dos problemas en CloudShell:
+1. `No space left on device` — el home de 1 GB se llenó (tgz de k6 + extraído +
+   git pull). Fix: `rm -rf ~/k6.tgz ~/k6-v0.49.0-linux-amd64`; si sigue lleno,
+   `du -sh ~/* ~/.* | sort -h | tail -10` para ver qué ocupa.
+2. Credenciales no parseadas: el parse con `python3 json.load` del endpoint
+   169.254.170.2 falló ("Extra data"), variables quedaron undefined y k6 no firmó
+   ("invalid AWS access key ID"). Fix robusto:
+   `eval "$(aws configure export-credentials --format env)"`
+   o fallback con jq:
+   `export AWS_ACCESS_KEY_ID=$(echo "$CREDS" | jq -r .AccessKeyId)` (y Secret/Token).
+
+Tras liberar espacio y exportar credenciales (ver Key=ASIA... Token set? yes),
+reintentar: `export QUEUE_URL=...; cd ~/ArquitecturaCloudPoc/load; TOTAL=100 k6 run normal.js`
+
 ### Después de verificar (pendientes)
 
 1. (Opcional) Purgar la cola antes de la prueba de carga — hay mensajes viejos
