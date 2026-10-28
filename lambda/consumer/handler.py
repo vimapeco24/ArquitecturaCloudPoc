@@ -22,16 +22,15 @@ import time
 import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
-from botocore.auth import SigV4Auth
-from botocore.awsrequest import AWSRequest
-from botocore.httpsession import URLLib3Session
-from urllib.parse import urlparse
 
 # ---------------------------------------------------------------------------
 # Configuración (inyectada por variables de entorno desde Terraform)
 # ---------------------------------------------------------------------------
 IDEMPOTENCY_TABLE = os.environ["IDEMPOTENCY_TABLE"]
-BACKEND_URL = os.environ["BACKEND_URL"]
+# Nombre (o ARN) de la Lambda del stub backend. Se invoca por la API de Lambda
+# (lambda:InvokeFunction), no por Function URL: la organización de la cuenta
+# bloquea las Function URLs (devuelven 403 con cualquier AuthType).
+BACKEND_FUNCTION = os.environ["BACKEND_FUNCTION"]
 MAX_RETRIES = int(os.environ.get("MAX_RETRIES", "3"))
 BASE_BACKOFF_SECONDS = float(os.environ.get("BASE_BACKOFF_SECONDS", "0.2"))
 BACKEND_TIMEOUT_SECONDS = float(os.environ.get("BACKEND_TIMEOUT_SECONDS", "5"))
@@ -41,14 +40,16 @@ IDEMPOTENCY_TTL_SECONDS = int(os.environ.get("IDEMPOTENCY_TTL_SECONDS", str(7 * 
 _ddb = boto3.resource("dynamodb", config=Config(retries={"max_attempts": 3, "mode": "standard"}))
 _table = _ddb.Table(IDEMPOTENCY_TABLE)
 
-# Sesión y región para firmar las llamadas a la Function URL del stub con SigV4.
-# El servicio para firmar una Lambda Function URL es "lambda".
-_session = boto3.session.Session()
-_region = _session.region_name or os.environ.get("AWS_REGION", "us-east-2")
-_backend_host = urlparse(BACKEND_URL).netloc
-# Cliente HTTP de botocore: firma y envío usan EXACTAMENTE los mismos headers,
-# evitando que un cliente externo (urllib) altere headers y rompa la firma SigV4.
-_http = URLLib3Session(timeout=BACKEND_TIMEOUT_SECONDS)
+# Cliente Lambda para invocar el stub backend. Timeout de lectura acotado y sin
+# reintentos de botocore (los reintentos de aplicación los controlamos nosotros).
+_lambda = boto3.client(
+    "lambda",
+    config=Config(
+        read_timeout=BACKEND_TIMEOUT_SECONDS,
+        connect_timeout=BACKEND_TIMEOUT_SECONDS,
+        retries={"max_attempts": 0},
+    ),
+)
 
 
 class PermanentError(Exception):
@@ -105,46 +106,51 @@ def _release_idempotency_key(key: str) -> None:
 
 
 def _call_backend(payload: dict) -> None:
-    """Llama al stub del backend con reintentos y backoff exponencial.
+    """Invoca el stub del backend (por API de Lambda) con reintentos y backoff.
 
-    Lanza PermanentError si se agotan los reintentos; así SQS reintentará la entrega
-    y, tras maxReceiveCount, moverá el mensaje a la DLQ.
+    Lanza PermanentError si se agotan los reintentos o si el backend rechaza el
+    pago con un error permanente (4xx distinto de 429); así SQS reintentará la
+    entrega y, tras maxReceiveCount, moverá el mensaje a la DLQ.
     """
-    data = json.dumps(payload).encode("utf-8")
+    # El stub conserva el contrato de una Function URL: lee event["body"] (string)
+    # y event["headers"]. Reproducimos ese sobre para no tocar el stub.
+    invoke_event = {
+        "body": json.dumps(payload),
+        "headers": {"x-idempotency-key": payload["payment_id"]},
+    }
+    raw_event = json.dumps(invoke_event).encode("utf-8")
+
     last_err = None
     for attempt in range(1, MAX_RETRIES + 1):
-        # Firma SigV4 para la Function URL (servicio "lambda"). Las credenciales
-        # provienen del rol de ejecución de la Lambda consumer. El mismo AWSRequest
-        # firmado se envía con el cliente de botocore para que los headers no cambien.
-        aws_request = AWSRequest(
-            method="POST",
-            url=BACKEND_URL,
-            data=data,
-            headers={
-                "Content-Type": "application/json",
-                "X-Idempotency-Key": payload["payment_id"],
-            },
-        )
-        credentials = _session.get_credentials().get_frozen_credentials()
-        SigV4Auth(credentials, "lambda", _region).add_auth(aws_request)
-
         try:
-            resp = _http.send(aws_request.prepare())
-            if 200 <= resp.status_code < 300:
-                return
-            last_err = f"HTTP {resp.status_code}"
-            body_txt = (resp.text or "")[:500] if hasattr(resp, "text") else ""
-            print(json.dumps({
-                "event": "backend_http_error",
-                "payment_id": payload["payment_id"],
-                "code": resp.status_code,
-                "body": body_txt,
-            }))
-            # 4xx (excepto 429) es error de datos: no reintentar.
-            if 400 <= resp.status_code < 500 and resp.status_code != 429:
-                raise PermanentError(f"backend rechazó el pago: {last_err}")
+            resp = _lambda.invoke(
+                FunctionName=BACKEND_FUNCTION,
+                InvocationType="RequestResponse",
+                Payload=raw_event,
+            )
+            # Error de la plataforma Lambda (función reventó, throttling, etc.).
+            if resp.get("FunctionError"):
+                last_err = resp["FunctionError"]
+            else:
+                result = json.loads(resp["Payload"].read())
+                status = int(result.get("statusCode", 500))
+                if 200 <= status < 300:
+                    return
+                last_err = f"HTTP {status}"
+                print(json.dumps({
+                    "event": "backend_http_error",
+                    "payment_id": payload["payment_id"],
+                    "code": status,
+                    "body": str(result.get("body"))[:500],
+                }))
+                # 4xx (excepto 429) es error de datos: no reintentar.
+                if 400 <= status < 500 and status != 429:
+                    raise PermanentError(f"backend rechazó el pago: {last_err}")
         except PermanentError:
             raise
+        except ClientError as exc:
+            # Throttling de Lambda u otro error transitorio del servicio → reintentar.
+            last_err = str(exc)
         except Exception as exc:  # errores de red/timeout → reintentar
             last_err = str(exc)
 

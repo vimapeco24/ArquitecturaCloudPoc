@@ -42,20 +42,10 @@ resource "aws_lambda_function" "stub" {
 
 resource "aws_lambda_function_url" "stub" {
   function_name      = aws_lambda_function.stub.function_name
-  # AWS_IAM: la org/cuenta bloquea Function URLs públicas (AuthType=NONE da 403
-  # aunque exista el permiso público). Con AWS_IAM el consumer firma con SigV4.
-  # Además es el modelo correcto para un backend transaccional bancario.
+  # AWS_IAM (no NONE): la organización de la cuenta bloquea las Function URLs
+  # (devuelven 403 con cualquier AuthType). La URL se mantiene por completitud,
+  # pero el consumer NO la usa: invoca el stub por la API de Lambda (invoke).
   authorization_type = "AWS_IAM"
-}
-
-# Permiso basado en recurso: solo el rol del consumer puede invocar la URL,
-# y la invocación debe venir firmada (FunctionUrlAuthType = AWS_IAM).
-resource "aws_lambda_permission" "stub_url_invoke" {
-  statement_id           = "AllowConsumerFunctionUrlInvoke"
-  action                 = "lambda:InvokeFunctionUrl"
-  function_name          = aws_lambda_function.stub.function_name
-  principal              = aws_iam_role.consumer.arn
-  function_url_auth_type = "AWS_IAM"
 }
 
 # ---- Consumidor SQS -------------------------------------------------------
@@ -83,7 +73,7 @@ resource "aws_lambda_function" "consumer" {
   environment {
     variables = {
       IDEMPOTENCY_TABLE = aws_dynamodb_table.idempotency.name
-      BACKEND_URL       = aws_lambda_function_url.stub.function_url
+      BACKEND_FUNCTION  = aws_lambda_function.stub.function_name
       MAX_RETRIES       = tostring(var.max_retries)
     }
   }

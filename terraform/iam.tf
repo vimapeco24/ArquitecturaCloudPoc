@@ -43,10 +43,10 @@ data "aws_iam_policy_document" "consumer" {
     resources = [aws_dynamodb_table.idempotency.arn]
   }
 
-  # Invocar la Function URL del stub backend (firmada con SigV4).
+  # Invocar el stub backend por la API de Lambda (invoke).
   statement {
-    sid       = "InvokeStubFunctionUrl"
-    actions   = ["lambda:InvokeFunctionUrl"]
+    sid       = "InvokeStubFunction"
+    actions   = ["lambda:InvokeFunction"]
     resources = [aws_lambda_function.stub.arn]
   }
 }
