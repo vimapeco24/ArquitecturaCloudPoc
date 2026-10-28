@@ -45,6 +45,17 @@ resource "aws_lambda_function_url" "stub" {
   authorization_type = "NONE" # PoC: endpoint público; en real iría tras IAM/VPC
 }
 
+# Permiso basado en recurso necesario para que una Function URL con
+# authorization_type = "NONE" sea invocable públicamente. Sin este statement
+# AWS responde HTTP 403 Forbidden a toda invocación (aunque la URL exista).
+resource "aws_lambda_permission" "stub_url_public" {
+  statement_id           = "AllowPublicFunctionUrlInvoke"
+  action                 = "lambda:InvokeFunctionUrl"
+  function_name          = aws_lambda_function.stub.function_name
+  principal              = "*"
+  function_url_auth_type = "NONE"
+}
+
 # ---- Consumidor SQS -------------------------------------------------------
 
 resource "aws_lambda_function" "consumer" {
