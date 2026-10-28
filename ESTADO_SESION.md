@@ -40,49 +40,60 @@ La PoC se prueba inyectando mensajes a SQS directamente. Esto es intencional, no
 
 - `3795914` PoC inicial completa
 - `64f24a8` fix: concurrencia reservada opcional para cuentas sandbox (límite 10)
-- `e540f38` fix: permiso público de invocación para la Function URL del stub (corrige HTTP 403)  ← ÚLTIMO
+- `e540f38` fix: permiso público Function URL (NO funcionó — ver abajo)
+- `04b1979` docs: handoff ESTADO_SESION.md
+- `dd06f7a` fix: migrar Function URL del stub a AWS_IAM + SigV4 en consumer  ← ÚLTIMO
 
-## Problema encontrado y resuelto
+## Problema encontrado (HTTP 403) — RESUELTO en código, falta aplicar
 
-**Síntoma:** todos los mensajes fallaban con `HTTP 403` en el consumer
-(`"error": "backend rechazó el pago: HTTP 403"`), nunca llegaban a DynamoDB.
+**Síntoma:** todos los mensajes fallan con `HTTP 403` en el consumer
+(`"error": "backend rechazó el pago: HTTP 403"`), nunca llegan a DynamoDB.
 
-**Causa raíz:** la Function URL del stub tiene `authorization_type = "NONE"` pero
-faltaba el `aws_lambda_permission` que autoriza la invocación pública
-(`lambda:InvokeFunctionUrl`, principal `*`, `function_url_auth_type = "NONE"`).
-Sin ese permiso AWS responde 403 aunque la URL exista. El handler del stub solo
-devuelve 200 o 503, así que el 403 era de infraestructura, no de código.
+**Intento 1 (commit e540f38) — FALLÓ:** añadir `aws_lambda_permission` público
+(`principal=*`, `AuthType=NONE`). Se aplicó pero el `curl` siguió dando 403.
+La `get-policy` mostró el permiso presente y la URL con `AuthType=NONE`, y aun así 403.
 
-**Fix:** se añadió `aws_lambda_permission.stub_url_public` en `terraform/lambda.tf`
-(commit `e540f38`, ya en GitHub).
+**Causa raíz real:** la cuenta/organización `aftc_test` **bloquea Function URLs
+públicas** (SCP o "block public access" de la org). Con `AuthType=NONE` siempre da
+403, sin importar el resource-policy. No es resoluble a nivel de recurso.
+
+**Fix definitivo (commit dd06f7a):** migrar a invocación autenticada con IAM:
+- `terraform/lambda.tf`: Function URL del stub → `authorization_type = "AWS_IAM"`;
+  `aws_lambda_permission.stub_url_invoke` con `principal = rol del consumer` y
+  `function_url_auth_type = "AWS_IAM"`.
+- `terraform/iam.tf`: statement `InvokeStubFunctionUrl` → el rol del consumer puede
+  `lambda:InvokeFunctionUrl` sobre el ARN del stub.
+- `lambda/consumer/handler.py`: la llamada al backend ahora se firma con **SigV4**
+  (botocore `SigV4Auth` + `AWSRequest`, servicio `lambda`). Sin dependencias extra.
+
+NOTA: con AWS_IAM la Function URL ya NO es accesible por `curl` simple (daría 403
+"correcto"); solo responde a peticiones firmadas. La verificación se hace por SQS.
 
 ## DÓNDE QUEDAMOS / PRÓXIMO PASO
 
-El fix ya está en GitHub. **Falta aplicarlo en CloudShell y verificar.**
+El fix definitivo (dd06f7a) ya está en GitHub. **Falta aplicarlo en CloudShell y verificar.**
 Ejecutar en CloudShell (`~/ArquitecturaCloudPoc/terraform`):
 
 ```bash
-# 1. Traer el fix y aplicar (debe crear SOLO 1 recurso: aws_lambda_permission.stub_url_public)
+# 1. Traer el fix y aplicar (debe modificar la Function URL + crear/actualizar permisos e IAM)
 cd ~/ArquitecturaCloudPoc && git pull && cd terraform
 terraform apply -auto-approve
 
-# 2. Verificar que la Function URL ya responde 200 (no 403)
-STUB_URL=$(terraform output -raw stub_function_url)
-curl -s -w "\nHTTP %{http_code}\n" -X POST "$STUB_URL" \
-  -H "Content-Type: application/json" -d '{"payment_id":"curl-ok","amount":1000}'
-#   Esperado: {"status": "EXECUTED", ...}  HTTP 200
-
-# 3. Pago de prueba por la cola + logs
+# 2. (Opcional) Purgar mensajes viejos que rebotan con 403
 QUEUE_URL=$(terraform output -raw queue_url)
+aws sqs purge-queue --region us-east-2 --queue-url "$QUEUE_URL"
+sleep 60   # purge tarda hasta 60s
+
+# 3. Pago de prueba por la cola (usar payment_id NUEVO) + logs
 aws sqs send-message --region us-east-2 --queue-url "$QUEUE_URL" \
-  --message-body '{"payment_id":"demo-ok-001","amount":15000,"currency":"COP","account":"cuenta-demo"}'
+  --message-body '{"payment_id":"demo-iam-001","amount":15000,"currency":"COP","account":"cuenta-demo"}'
 sleep 12
 aws logs tail /aws/lambda/breb-poc-consumer --region us-east-2 --since 2m --format short
-#   Esperado en logs: {"event": "processed", "payment_id": "demo-ok-001"}
+#   Esperado en logs: {"event": "processed", "payment_id": "demo-iam-001"}
 
 # 4. Confirmar persistencia/idempotencia en DynamoDB
 aws dynamodb get-item --region us-east-2 --table-name breb-poc-idempotency \
-  --key '{"payment_key":{"S":"demo-ok-001"}}' --output json
+  --key '{"payment_key":{"S":"demo-iam-001"}}' --output json
 #   Esperado: "status": {"S": "DONE"}
 ```
 
