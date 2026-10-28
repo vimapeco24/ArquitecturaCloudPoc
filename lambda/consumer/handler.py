@@ -24,6 +24,9 @@ import urllib.error
 import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
+from botocore.auth import SigV4Auth
+from botocore.awsrequest import AWSRequest
+from urllib.parse import urlparse
 
 # ---------------------------------------------------------------------------
 # Configuración (inyectada por variables de entorno desde Terraform)
@@ -38,6 +41,12 @@ IDEMPOTENCY_TTL_SECONDS = int(os.environ.get("IDEMPOTENCY_TTL_SECONDS", str(7 * 
 
 _ddb = boto3.resource("dynamodb", config=Config(retries={"max_attempts": 3, "mode": "standard"}))
 _table = _ddb.Table(IDEMPOTENCY_TABLE)
+
+# Sesión y región para firmar las llamadas a la Function URL del stub con SigV4.
+# El servicio para firmar una Lambda Function URL es "lambda".
+_session = boto3.session.Session()
+_region = _session.region_name or os.environ.get("AWS_REGION", "us-east-2")
+_backend_host = urlparse(BACKEND_URL).netloc
 
 
 class PermanentError(Exception):
@@ -102,14 +111,25 @@ def _call_backend(payload: dict) -> None:
     data = json.dumps(payload).encode("utf-8")
     last_err = None
     for attempt in range(1, MAX_RETRIES + 1):
-        req = urllib.request.Request(
-            BACKEND_URL,
+        # Firma SigV4 para la Function URL (servicio "lambda"). Las credenciales
+        # provienen del rol de ejecución de la Lambda consumer.
+        aws_request = AWSRequest(
+            method="POST",
+            url=BACKEND_URL,
             data=data,
             headers={
                 "Content-Type": "application/json",
-                # Clave de idempotencia también hacia el backend real.
+                "Host": _backend_host,
                 "X-Idempotency-Key": payload["payment_id"],
             },
+        )
+        credentials = _session.get_credentials()
+        SigV4Auth(credentials, "lambda", _region).add_auth(aws_request)
+
+        req = urllib.request.Request(
+            BACKEND_URL,
+            data=data,
+            headers=dict(aws_request.headers),
             method="POST",
         )
         try:

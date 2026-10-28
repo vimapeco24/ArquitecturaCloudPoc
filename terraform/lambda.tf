@@ -42,18 +42,20 @@ resource "aws_lambda_function" "stub" {
 
 resource "aws_lambda_function_url" "stub" {
   function_name      = aws_lambda_function.stub.function_name
-  authorization_type = "NONE" # PoC: endpoint público; en real iría tras IAM/VPC
+  # AWS_IAM: la org/cuenta bloquea Function URLs públicas (AuthType=NONE da 403
+  # aunque exista el permiso público). Con AWS_IAM el consumer firma con SigV4.
+  # Además es el modelo correcto para un backend transaccional bancario.
+  authorization_type = "AWS_IAM"
 }
 
-# Permiso basado en recurso necesario para que una Function URL con
-# authorization_type = "NONE" sea invocable públicamente. Sin este statement
-# AWS responde HTTP 403 Forbidden a toda invocación (aunque la URL exista).
-resource "aws_lambda_permission" "stub_url_public" {
-  statement_id           = "AllowPublicFunctionUrlInvoke"
+# Permiso basado en recurso: solo el rol del consumer puede invocar la URL,
+# y la invocación debe venir firmada (FunctionUrlAuthType = AWS_IAM).
+resource "aws_lambda_permission" "stub_url_invoke" {
+  statement_id           = "AllowConsumerFunctionUrlInvoke"
   action                 = "lambda:InvokeFunctionUrl"
   function_name          = aws_lambda_function.stub.function_name
-  principal              = "*"
-  function_url_auth_type = "NONE"
+  principal              = aws_iam_role.consumer.arn
+  function_url_auth_type = "AWS_IAM"
 }
 
 # ---- Consumidor SQS -------------------------------------------------------
