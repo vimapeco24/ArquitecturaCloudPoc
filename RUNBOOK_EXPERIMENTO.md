@@ -207,7 +207,13 @@ Interpretación:
 
 ## Fase 6 — Mostrar la evidencia por la CONSOLA WEB (para los profesores)
 
-Sigue la guía detallada en **`GUIA_CONSOLA_AWS.md`**. Resumen del guion (5–7 min):
+Hay **dos formas de demostrar** la PoC ante los evaluadores, complementarias:
+
+### Opción A — Demostración visual de lo ya ejecutado (recomendada)
+
+Se usa cuando ya se corrió al menos un escenario de carga (Fase 3). Toda la demostración
+es **navegando la consola web**, sin terminal. Sigue el guion detallado de
+**`GUIA_CONSOLA_AWS.md`** (secciones 1–7). Resumen (5–7 min):
 
 1. **Diagrama** `BreB_PoC_AWS.png` → explicar Queue-Based Load Leveling e idempotencia.
 2. **CloudWatch → Dashboards → `breb-poc-dashboard`**
@@ -227,6 +233,31 @@ Sigue la guía detallada en **`GUIA_CONSOLA_AWS.md`**. Resumen del guion (5–7 
 > Cierre: *"Ningún pago se pierde (DLQ + reintentos con backoff) y ninguno se duplica
 > (idempotencia con PutItem condicional en DynamoDB), incluso absorbiendo el pico de
 > las 6:00 a.m. mediante Queue-Based Load Leveling."*
+
+### Opción B — Demo manual de un pago, 100 % por la consola web (sin CloudShell)
+
+Se usa para mostrar el flujo "en vivo" enviando un pago a mano desde la consola de SQS,
+**sin usar la terminal**. Paso a paso completo en `GUIA_CONSOLA_AWS.md` (sección 9):
+
+1. **SQS → `breb-poc-queue` → Send and receive messages** → en *Message body* pega
+   (usa un `payment_id` NUEVO cada vez) y clic en **Send message**:
+   ```json
+   {"payment_id":"demo-profe-001","amount":15000,"currency":"COP","account_from":"000123","account_to":"000987"}
+   ```
+2. **Lambda `breb-poc-consumer` → Monitor → View CloudWatch logs** → aparece
+   `{"event":"processed","payment_id":"demo-profe-001"}`.
+3. **DynamoDB → `breb-poc-idempotency` → Explore table items** → ítem `demo-profe-001`
+   con `status = DONE`.
+4. **Demostrar idempotencia (ASR-2):** reenvía el **mismo JSON** → en los logs verás
+   `{"event":"duplicate_skipped",...}` y en DynamoDB el ítem **sigue siendo uno solo**
+   (el pago NO se ejecutó dos veces).
+5. (Opcional) **CloudWatch → X-Ray → Service map** → traza `consumer → stub → DynamoDB`.
+
+> **Cuándo usar cada una:** la Opción A evidencia el **desempeño bajo carga** (TPS, p95,
+> drenado del pico) con datos reales en el dashboard; la Opción B evidencia el **ciclo de
+> un pago y la idempotencia** de forma interactiva. La carga masiva (2.000/6.000 mensajes)
+> solo se puede generar con CloudShell (Fase 3); la demostración y las evidencias son
+> 100 % visuales por consola.
 
 ---
 

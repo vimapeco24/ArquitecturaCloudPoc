@@ -148,3 +148,52 @@ cd ../load
 ./load_cli.sh 2000 fault 25    # ASR-2: fallo + duplicados
 cd .. && ./scripts/verify.sh   # resumen de criterios de éxito
 ```
+
+---
+
+## 9. Demo manual de un pago — 100 % por la CONSOLA WEB (sin CloudShell)
+
+> Esta es la **Opción B**: ejecutar y evidenciar el flujo de un pago **sin usar la
+> terminal**, enviando el mensaje a mano desde la consola de SQS. Ideal para mostrar
+> el flujo "en vivo" ante los profesores. (La carga masiva de 2.000/6.000 mensajes
+> para medir TPS sí requiere CloudShell una sola vez — ver sección 8).
+
+### 9.1 Enviar un pago (ejecución del pago)
+1. Consola → **SQS** → **Queues** → `breb-poc-queue`.
+   Link: https://us-east-2.console.aws.amazon.com/sqs/v3/home?region=us-east-2#/queues
+2. Botón **Send and receive messages** (arriba a la derecha).
+3. En **Message body** pega el pago (usa un `payment_id` NUEVO cada vez):
+   ```json
+   {"payment_id":"demo-profe-001","amount":15000,"currency":"COP","account_from":"000123","account_to":"000987"}
+   ```
+4. Clic en **Send message**. El mensaje entra a la cola y el consumidor lo toma en segundos.
+
+### 9.2 Ver que el pago se procesó (logs del consumer)
+5. Consola → **Lambda** → `breb-poc-consumer` → pestaña **Monitor** → **View CloudWatch logs**.
+6. Abre el **Log stream** más reciente. Debe aparecer:
+   ```json
+   {"event": "processed", "payment_id": "demo-profe-001"}
+   ```
+
+### 9.3 Ver la evidencia en la base de idempotencia
+7. Consola → **DynamoDB** → **Tables** → `breb-poc-idempotency` → **Explore table items**.
+8. Verás el ítem con `payment_key = demo-profe-001`, `status = DONE`, `created_at`,
+   `done_at` y `expires_at` (TTL).
+
+### 9.4 Demostrar la idempotencia (ASR-2: 0 duplicados)
+9. Vuelve a **SQS → breb-poc-queue → Send and receive messages** y envía **exactamente
+   el mismo JSON** (mismo `payment_id = demo-profe-001`).
+10. En los logs del consumer (paso 5–6) aparecerá ahora:
+    ```json
+    {"event": "duplicate_skipped", "payment_id": "demo-profe-001"}
+    ```
+11. En DynamoDB (paso 7–8), el ítem `demo-profe-001` **sigue siendo uno solo**: el pago
+    NO se ejecutó dos veces. Esto evidencia la garantía exactamente-una-vez.
+
+### 9.5 (Opcional) Ver la traza extremo a extremo
+12. Consola → **CloudWatch** → **X-Ray traces** → **Service map**: el grafo
+    `breb-poc-consumer → breb-poc-stub-backend → DynamoDB`, con latencias por segmento.
+
+> Resultado de la Opción B: con solo la consola web se evidencia el ciclo completo de un
+> pago (ejecución, persistencia e idempotencia). Para las métricas de desempeño bajo carga
+> (TPS, p95, drenado del pico), se usa el dashboard alimentado por la corrida de la sección 8.
