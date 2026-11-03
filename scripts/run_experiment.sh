@@ -25,6 +25,11 @@ TOTAL="${2:-2000}"
 DUP_EVERY="${3:-25}"
 REGION="${AWS_REGION:-us-east-2}"
 export AWS_REGION="$REGION"
+# PURGE=0 salta la purga + el sleep de 60s (útil para encadenar escenarios rápido,
+# ya que cada escenario usa payment_id únicos: pay-normal-*, pay-stress-*, pay-fault-*).
+#   ./scripts/run_experiment.sh normal 1000        (con purga, parte de cero)
+#   PURGE=0 ./scripts/run_experiment.sh stress 3000 (sin purga, arranca al instante)
+PURGE="${PURGE:-1}"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT/terraform"
@@ -37,16 +42,30 @@ echo "# EXPERIMENTO PoC Bre-B · escenario=$SCENARIO · total=$TOTAL · región=
 echo "################################################################"
 
 echo; echo ">>> [1/4] Purgando cola principal y DLQ (parten de cero)…"
-aws sqs purge-queue --region "$REGION" --queue-url "$QUEUE_URL" || true
-aws sqs purge-queue --region "$REGION" --queue-url "$DLQ_URL"   || true
-echo "    (las colas tardan ~60 s en quedar totalmente vacías)"
-sleep 60
+if [ "$PURGE" = "1" ]; then
+  aws sqs purge-queue --region "$REGION" --queue-url "$QUEUE_URL" || true
+  aws sqs purge-queue --region "$REGION" --queue-url "$DLQ_URL"   || true
+  echo "    (las colas tardan ~60 s en quedar totalmente vacías)"
+  sleep 60
+else
+  echo "    PURGE=0 → se omite la purga y la espera (encadenado rápido de escenarios)."
+fi
 
 echo; echo ">>> [2/4] Inyectando carga ($SCENARIO, $TOTAL mensajes)…"
-if [ "$SCENARIO" = "fault" ]; then
-  ./load/load_cli.sh "$TOTAL" fault "$DUP_EVERY"
+export QUEUE_URL
+# Inyector rápido con boto3 + hilos (segundos). Fallback al CLI si no hay python/boto3.
+if python3 -c "import boto3" 2>/dev/null; then
+  if [ "$SCENARIO" = "fault" ]; then
+    python3 ./load/load_fast.py "$TOTAL" fault "$DUP_EVERY"
+  else
+    python3 ./load/load_fast.py "$TOTAL" "$SCENARIO"
+  fi
 else
-  ./load/load_cli.sh "$TOTAL" "$SCENARIO"
+  if [ "$SCENARIO" = "fault" ]; then
+    ./load/load_cli.sh "$TOTAL" fault "$DUP_EVERY"
+  else
+    ./load/load_cli.sh "$TOTAL" "$SCENARIO"
+  fi
 fi
 
 echo; echo ">>> [3/4] Esperando el drenado de la cola (consumo dosificado)…"
