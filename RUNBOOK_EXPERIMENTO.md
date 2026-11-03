@@ -100,14 +100,28 @@ aws sqs get-queue-attributes --region "$AWS_REGION" --queue-url "$DLQ_URL" \
 ### Opción rápida (recomendada para la demo): script maestro
 
 `scripts/run_experiment.sh` hace todo de un tirón: purga las colas, inyecta la carga,
-espera el drenado e imprime verificación + métricas. Un comando por escenario:
+espera el drenado e imprime verificación + métricas. Volúmenes por defecto rápidos
+(500 normal/fault, 1500 stress). Un comando por escenario:
 
 ```bash
 cd ~/ArquitecturaCloudPoc
-./scripts/run_experiment.sh normal 2000     # ASR-1 nominal
-./scripts/run_experiment.sh stress 6000     # pico 6:00 a.m.
-./scripts/run_experiment.sh fault  2000 25  # ASR-2: fallo + duplicados
+./scripts/run_experiment.sh normal              # 500 msg · ASR-1 nominal
+./scripts/run_experiment.sh stress              # 1500 msg · pico 6:00 a.m.
+./scripts/run_experiment.sh fault               # 500 msg · ASR-2: fallo + duplicados
 ```
+
+Para encadenar los tres MUY rápido (sin el sleep de 60 s entre escenarios), usa
+`PURGE=0` en el 2º y 3er escenario (cada uno usa payment_id únicos):
+
+```bash
+./scripts/run_experiment.sh normal              # con purga (parte de cero)
+PURGE=0 ./scripts/run_experiment.sh stress
+PURGE=0 ./scripts/run_experiment.sh fault
+```
+
+El inyector por defecto es `load/load_fast.py` (boto3 + hilos: envía cientos de
+mensajes en segundos). Puedes sobrescribir el volumen pasando el número:
+`./scripts/run_experiment.sh normal 1000`.
 
 ### Opción manual (paso a paso)
 

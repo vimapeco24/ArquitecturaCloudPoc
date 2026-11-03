@@ -21,7 +21,7 @@
 # ---------------------------------------------------------------------------
 set -euo pipefail
 
-TOTAL="${1:-2000}"
+TOTAL="${1:-500}"
 SCENARIO="${2:-normal}"
 DUP_EVERY="${3:-25}"
 REGION="${AWS_REGION:-us-east-2}"

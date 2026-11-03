@@ -21,13 +21,20 @@
 set -euo pipefail
 
 SCENARIO="${1:-normal}"
-TOTAL="${2:-2000}"
+# TOTAL por defecto según escenario (rápido y eficiente para la demo):
+#   normal/fault = 500 ; stress = 1500 (mayor, para que el pico sea representativo).
+# Puedes sobrescribirlo pasando el nº como 2º argumento.
+if [ "$SCENARIO" = "stress" ]; then
+  TOTAL="${2:-1500}"
+else
+  TOTAL="${2:-500}"
+fi
 DUP_EVERY="${3:-25}"
 REGION="${AWS_REGION:-us-east-2}"
 export AWS_REGION="$REGION"
 # PURGE=0 salta la purga + el sleep de 60s (útil para encadenar escenarios rápido,
 # ya que cada escenario usa payment_id únicos: pay-normal-*, pay-stress-*, pay-fault-*).
-#   ./scripts/run_experiment.sh normal 1000        (con purga, parte de cero)
+#   ./scripts/run_experiment.sh normal             (500 msg, con purga, parte de cero)
 #   PURGE=0 ./scripts/run_experiment.sh stress 3000 (sin purga, arranca al instante)
 PURGE="${PURGE:-1}"
 

@@ -26,7 +26,7 @@ from concurrent.futures import ThreadPoolExecutor
 import boto3
 from botocore.config import Config
 
-TOTAL = int(sys.argv[1]) if len(sys.argv) > 1 else 1000
+TOTAL = int(sys.argv[1]) if len(sys.argv) > 1 else 500
 SCENARIO = sys.argv[2] if len(sys.argv) > 2 else "normal"
 DUP_EVERY = int(sys.argv[3]) if len(sys.argv) > 3 else 25
 REGION = os.environ.get("AWS_REGION", "us-east-2")
