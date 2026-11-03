@@ -25,6 +25,11 @@ FN="breb-poc-consumer"
 # mensajes por invocación = batch_size del event source mapping (def. 10).
 BATCH="${BATCH_SIZE:-10}"
 
+# Rango de medición: por defecto 20 min hacia atrás, pero acotado a los últimos
+# minutos de actividad real. Todas las llamadas a CloudWatch llevan timeout para
+# que el script no se quede colgado si la API tarda.
+AWS="aws --cli-read-timeout 15 --cli-connect-timeout 5"
+
 if date -u -d "@0" >/dev/null 2>&1; then
   END=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   START=$(date -u -d "-${MINUTES} min" +%Y-%m-%dT%H:%M:%SZ)
@@ -40,38 +45,38 @@ echo " $START  ->  $END"
 echo "=============================================="
 
 # Serie por minuto de invocaciones (para hallar el minuto pico sostenido).
-INV_SERIES=$(aws cloudwatch get-metric-statistics --region "$REGION" \
+INV_SERIES=$($AWS cloudwatch get-metric-statistics --region "$REGION" \
   --namespace AWS/Lambda --metric-name Invocations \
   --dimensions Name=FunctionName,Value="$FN" \
   --start-time "$START" --end-time "$END" --period 60 --statistics Sum \
   --query 'Datapoints[].Sum' --output text 2>/dev/null)
 
-ERRORS=$(aws cloudwatch get-metric-statistics --region "$REGION" \
+ERRORS=$($AWS cloudwatch get-metric-statistics --region "$REGION" \
   --namespace AWS/Lambda --metric-name Errors \
   --dimensions Name=FunctionName,Value="$FN" \
   --start-time "$START" --end-time "$END" --period "$(( MINUTES*60 ))" --statistics Sum \
   --query 'Datapoints[0].Sum' --output text 2>/dev/null); ERRORS=${ERRORS//None/0}
 
-INV_TOTAL=$(aws cloudwatch get-metric-statistics --region "$REGION" \
+INV_TOTAL=$($AWS cloudwatch get-metric-statistics --region "$REGION" \
   --namespace AWS/Lambda --metric-name Invocations \
   --dimensions Name=FunctionName,Value="$FN" \
   --start-time "$START" --end-time "$END" --period "$(( MINUTES*60 ))" --statistics Sum \
   --query 'Datapoints[0].Sum' --output text 2>/dev/null); INV_TOTAL=${INV_TOTAL//None/0}
 
-P95=$(aws cloudwatch get-metric-statistics --region "$REGION" \
+P95=$($AWS cloudwatch get-metric-statistics --region "$REGION" \
   --namespace AWS/Lambda --metric-name Duration \
   --dimensions Name=FunctionName,Value="$FN" \
   --start-time "$START" --end-time "$END" --period "$(( MINUTES*60 ))" \
   --extended-statistics p95 \
   --query 'Datapoints[0].ExtendedStatistics.p95' --output text 2>/dev/null); P95=${P95//None/0}
-P50=$(aws cloudwatch get-metric-statistics --region "$REGION" \
+P50=$($AWS cloudwatch get-metric-statistics --region "$REGION" \
   --namespace AWS/Lambda --metric-name Duration \
   --dimensions Name=FunctionName,Value="$FN" \
   --start-time "$START" --end-time "$END" --period "$(( MINUTES*60 ))" \
   --extended-statistics p50 \
   --query 'Datapoints[0].ExtendedStatistics.p50' --output text 2>/dev/null); P50=${P50//None/0}
 
-CONC=$(aws cloudwatch get-metric-statistics --region "$REGION" \
+CONC=$($AWS cloudwatch get-metric-statistics --region "$REGION" \
   --namespace AWS/Lambda --metric-name ConcurrentExecutions \
   --dimensions Name=FunctionName,Value="$FN" \
   --start-time "$START" --end-time "$END" --period "$(( MINUTES*60 ))" --statistics Maximum \
