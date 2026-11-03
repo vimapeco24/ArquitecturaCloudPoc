@@ -50,15 +50,15 @@ else
 fi
 
 echo; echo ">>> [3/4] Esperando el drenado de la cola (consumo dosificado)…"
-for i in $(seq 1 30); do
+for i in $(seq 1 60); do
   VIS=$(aws sqs get-queue-attributes --region "$REGION" --queue-url "$QUEUE_URL" \
     --attribute-names ApproximateNumberOfMessages ApproximateNumberOfMessagesNotVisible \
     --query 'join(`+`,[Attributes.ApproximateNumberOfMessages,Attributes.ApproximateNumberOfMessagesNotVisible])' \
     --output text 2>/dev/null || echo "?+?")
-  echo "    t=$((i*10))s  cola(visible+enVuelo) = $VIS"
+  echo "    t=$((i*5))s  cola(visible+enVuelo) = $VIS"
   LEFT=$(echo "$VIS" | awk -F+ '{print ($1+$2)}')
   [ "${LEFT:-1}" = "0" ] && { echo "    cola drenada."; break; }
-  sleep 10
+  sleep 5
 done
 
 echo; echo ">>> [4/4] Verificación y métricas"
