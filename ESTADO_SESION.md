@@ -340,3 +340,15 @@ Creados en `221026/poc-breb-aws/` y exportados a PNG con la CLI de drawio (-s 2)
 - Correr `./load_cli.sh 2000 normal`, `6000 stress`, `2000 fault 25` y capturar el
   dashboard real (opcional: reemplazar las figuras ilustrativas por capturas reales).
 - Reemplazar el enlace del video en 17.4 por el definitivo.
+
+## Sesión 2026-11-03 (cont.) — Scripts del experimento + runbook en el Word
+
+- NUEVO `scripts/metrics.sh`: calcula desde CloudWatch el throughput (TPS), la
+  latencia p95 y el error rate del consumer e imprime OK/REVISAR vs ASR-1.
+- NUEVO `scripts/run_experiment.sh`: orquesta un escenario completo de un tirón
+  (purga colas → inyecta carga → espera drenado → verify.sh + metrics.sh). Ideal demo.
+- `RUNBOOK_EXPERIMENTO.md`: añadida la opción rápida (run_experiment.sh) y metrics.sh.
+- Documento Word: añadida sección **17.5 Guía de ejecución del experimento (paso a paso)**
+  con Fases 0–6 y comandos, + **Figura 16** (diagrama del runbook). TOC actualizada.
+  Nuevo diagrama `BreB_PoC_Runbook.(drawio|png)`.
+- Commit local en el repo de la PoC (rama main). Falta `git push` (pendiente de tu OK).

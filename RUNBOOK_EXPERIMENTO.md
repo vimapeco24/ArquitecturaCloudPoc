@@ -97,6 +97,20 @@ aws sqs get-queue-attributes --region "$AWS_REGION" --queue-url "$DLQ_URL" \
 
 ## Fase 3 — Ejecutar los escenarios de carga
 
+### Opción rápida (recomendada para la demo): script maestro
+
+`scripts/run_experiment.sh` hace todo de un tirón: purga las colas, inyecta la carga,
+espera el drenado e imprime verificación + métricas. Un comando por escenario:
+
+```bash
+cd ~/ArquitecturaCloudPoc
+./scripts/run_experiment.sh normal 2000     # ASR-1 nominal
+./scripts/run_experiment.sh stress 6000     # pico 6:00 a.m.
+./scripts/run_experiment.sh fault  2000 25  # ASR-2: fallo + duplicados
+```
+
+### Opción manual (paso a paso)
+
 La carga se inyecta con **`load/load_cli.sh`** (AWS CLI, `send-message-batch` en
 paralelo). Uso: `./load_cli.sh [TOTAL] [ESCENARIO] [DUP_EVERY]`.
 
@@ -154,7 +168,8 @@ Script que resume todo de una vez:
 
 ```bash
 cd ~/ArquitecturaCloudPoc
-./scripts/verify.sh
+./scripts/verify.sh      # profundidad de colas, DLQ y pagos únicos (idempotencia)
+./scripts/metrics.sh 15  # throughput (TPS), latencia p95 y error rate desde CloudWatch (ASR-1)
 ```
 
 O comando a comando:
