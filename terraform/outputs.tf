@@ -1,5 +1,5 @@
 output "queue_url" {
-  description = "URL de la cola principal SQS (para inyectar carga con k6)."
+  description = "URL de la cola principal SQS (para inyectar carga con load/load_cli.sh)."
   value       = aws_sqs_queue.main.id
 }
 

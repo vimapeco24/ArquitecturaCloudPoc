@@ -1,10 +1,15 @@
 # Copia a terraform.tfvars y ajusta según el escenario.
 
-aws_region  = "us-east-1"
+aws_region  = "us-east-2"   # Ohio (región del despliegue verificado)
 name_prefix = "breb-poc"
 
 # --- Queue-Based Load Leveling ---
-reserved_concurrency       = 20   # N: límite de solicitudes paralelas al backend
+# N: límite de solicitudes paralelas al backend. En cuentas sandbox cuyo límite
+# total de concurrencia es 10 (y no permiten reservar a nivel de función), deja
+# reserved_concurrency = 0: el dosificado se mantiene vía el maximum_concurrency
+# del event source mapping (mínimo 2). En producción, dimensiónalo a la capacidad
+# real del core (p. ej. 20) para sostener >= 10 TPS dentro de la ventana de 60 min.
+reserved_concurrency       = 2    # PoC sandbox. Producción: 20.
 sqs_batch_size             = 10
 max_receive_count          = 5
 visibility_timeout_seconds = 60

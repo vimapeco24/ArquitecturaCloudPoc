@@ -10,8 +10,14 @@ Prueba de concepto que valida los requisitos de arquitectura significativos (ASR
   ejecuta dos veces, incluso ante fallos transitorios del backend.
 
 El patrón central es **Queue-Based Load Leveling**: una cola (SQS) desacopla el generador del
-consumidor, y la **concurrencia reservada** de Lambda dosifica el ritmo con el que el backend
-transaccional recibe solicitudes, protegiéndolo del pico.
+consumidor, y la **concurrencia del consumidor** (concurrencia reservada de Lambda en producción,
+o `maximum_concurrency` del event source mapping en la cuenta sandbox) dosifica el ritmo con el
+que el backend transaccional recibe solicitudes, protegiéndolo del pico.
+
+> **Estado:** DESPLEGADO y VERIFICADO end-to-end el 2026-10-28 en la cuenta `aftc_test`
+> (`803647807230`), región **us-east-2 (Ohio)**. Diagramas de la PoC en
+> `BreB_PoC_AWS.(drawio|png)` (arquitectura), `BreB_PoC_Secuencia.*` (flujo end-to-end),
+> `BreB_PoC_Resultados.*` (tablero de métricas) y `BreB_PoC_Idempotencia.*` (ASR-2).
 
 ---
 
@@ -86,7 +92,7 @@ Las herramientas no venían instaladas en este equipo. Instálalas antes de desp
 brew install terraform awscli k6
 
 # Credenciales AWS
-aws configure            # access key, secret, región (p.ej. us-east-1)
+aws configure            # access key, secret, región us-east-2
 aws sts get-caller-identity   # debe devolver tu cuenta
 ```
 
@@ -111,20 +117,36 @@ terraform apply -auto-approve
 
 ## Ejecución de las pruebas
 
+La carga se inyecta con **`load/load_cli.sh`** (AWS CLI, `send-message-batch` en paralelo).
+Se evaluó k6 pero se descartó por una incompatibilidad de su jslib de AWS con el runtime de
+CloudShell; los scripts k6 (`load/normal.js`, `load/stress.js`, `load/fault.js`) quedan como
+alternativa.
+
 ```bash
-# Exporta la URL de la cola (sale de terraform output)
-export QUEUE_URL=$(cd terraform && terraform output -raw queue_url)
-export AWS_REGION=us-east-1
+# Escenario NORMAL (2.000 mensajes)
+./load/load_cli.sh 2000 normal
 
-# Escenario normal (2.000 mensajes)
-k6 run load/normal.js
+# Escenario de ESTRÉS / pico 6:00 a.m. (6.000 mensajes)
+./load/load_cli.sh 6000 stress
 
-# Escenario de estrés (6.000 mensajes)
-k6 run load/stress.js
-
-# El escenario de fallo transitorio se valida con el stub en modo 5% de error
-# (variable error_rate del stub, configurable en terraform.tfvars) + revisar la DLQ.
+# Escenario de FALLO transitorio + duplicados (valida reintentos, DLQ e idempotencia ASR-2)
+# 1 de cada 25 mensajes reutiliza un payment_id previo (duplicado intencional)
+./load/load_cli.sh 2000 fault 25
 ```
+
+Observa en paralelo la profundidad de la cola y los logs del consumidor:
+
+```bash
+QUEUE_URL=$(cd terraform && terraform output -raw queue_url)
+watch -n2 "aws sqs get-queue-attributes --region us-east-2 --queue-url $QUEUE_URL \
+  --attribute-names ApproximateNumberOfMessages ApproximateNumberOfMessagesNotVisible"
+aws logs tail /aws/lambda/breb-poc-consumer --region us-east-2 --since 5m --follow
+```
+
+> **Nota de implementación real:** la organización de la cuenta `aftc_test` bloquea las Lambda
+> Function URLs (responden HTTP 403 con cualquier AuthType). Por eso el consumidor invoca el stub
+> por la **API de Lambda** (`lambda:InvokeFunction`), no por Function URL. La URL se deja
+> aprovisionada por completitud pero no se usa.
 
 ## Verificación de resultados
 

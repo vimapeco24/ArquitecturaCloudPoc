@@ -1,0 +1,67 @@
+<mxfile host="app.diagrams.net" agent="Kiro" version="24.0.0">
+  <diagram name="PoC Idempotencia" id="poc-idem">
+    <mxGraphModel dx="1600" dy="1000" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="960" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <mxCell id="title" value="PoC Bre-B · ASR-2 — Procesamiento exactamente-una-vez (idempotencia y DLQ)&#10;Amazon DynamoDB con PutItem condicional: ni pérdidas ni pagos duplicados" style="text;html=1;align=center;fontSize=16;fontStyle=1;fontColor=#232F3E;" vertex="1" parent="1"><mxGeometry x="250" y="16" width="1200" height="44" as="geometry"/></mxCell>
+
+        <!-- Entrada -->
+        <mxCell id="start" value="Mensaje de SQS&#10;payment_id = P" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCE4F1;strokeColor=#E7157B;fontColor=#232F3E;fontSize=12;" vertex="1" parent="1"><mxGeometry x="120" y="175" width="180" height="70" as="geometry"/></mxCell>
+
+        <!-- Decision: PutItem condicional -->
+        <mxCell id="dec" value="DynamoDB PutItem&#10;ConditionExpression:&#10;attribute_not_exists(payment_key)" style="rhombus;whiteSpace=wrap;html=1;fillColor=#EAE6FB;strokeColor=#2E27AD;fontColor=#232F3E;fontSize=11;" vertex="1" parent="1"><mxGeometry x="380" y="160" width="230" height="110" as="geometry"/></mxCell>
+        <mxCell id="eStart" value="" style="endArrow=classic;html=1;strokeColor=#232F3E;" edge="1" parent="1" source="start" target="dec"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- Rama NUEVO -->
+        <mxCell id="newBox" value="Clave NUEVA&#10;(reserva OK, status=PROCESSING)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#2d6a2d;fontColor=#1b4d1b;fontSize=11;" vertex="1" parent="1"><mxGeometry x="700" y="115" width="220" height="70" as="geometry"/></mxCell>
+        <mxCell id="eNew" value="éxito" style="endArrow=classic;html=1;fontColor=#2d6a2d;strokeColor=#2d6a2d;" edge="1" parent="1" source="dec" target="newBox"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- invoke backend -->
+        <mxCell id="invoke" value="" style="sketch=0;outlineConnect=0;fillColor=#ED7100;strokeColor=none;html=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=11;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;" vertex="1" parent="1"><mxGeometry x="1010" y="110" width="60" height="60" as="geometry"/></mxCell>
+        <mxCell id="invokeT" value="&lt;b&gt;invoke stub backend&lt;/b&gt;&#10;(ejecuta la transferencia)" style="text;html=1;align=center;fontSize=10;fontColor=#555;" vertex="1" parent="1"><mxGeometry x="970" y="171" width="150" height="30" as="geometry"/></mxCell>
+        <mxCell id="eInv" value="" style="endArrow=classic;html=1;strokeColor=#ED7100;" edge="1" parent="1" source="newBox" target="invoke"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- resultado backend decision -->
+        <mxCell id="decR" value="¿Backend respondió 200?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FDF3E7;strokeColor=#ED7100;fontColor=#232F3E;fontSize=11;" vertex="1" parent="1"><mxGeometry x="1200" y="95" width="200" height="90" as="geometry"/></mxCell>
+        <mxCell id="eR" value="" style="endArrow=classic;html=1;strokeColor=#ED7100;" edge="1" parent="1" source="invoke" target="decR"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- Done -->
+        <mxCell id="done" value="UpdateItem status=DONE&#10;→ pago ejecutado 1 vez&#10;log: &quot;processed&quot;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#2d6a2d;fontColor=#1b4d1b;fontSize=11;" vertex="1" parent="1"><mxGeometry x="1230" y="255" width="200" height="80" as="geometry"/></mxCell>
+        <mxCell id="eDone" value="sí (EXECUTED)" style="endArrow=classic;html=1;fontColor=#2d6a2d;strokeColor=#2d6a2d;" edge="1" parent="1" source="decR" target="done"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- retry/release -->
+        <mxCell id="retry" value="Libera reserva (delete si PROCESSING)&#10;Reintentos con backoff (hasta 3)&#10;Si persisten → excepción" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FDECEA;strokeColor=#b85450;fontColor=#8a2f23;fontSize=11;" vertex="1" parent="1"><mxGeometry x="1000" y="255" width="200" height="90" as="geometry"/></mxCell>
+        <mxCell id="eRetry" value="no (503 / timeout)" style="endArrow=classic;html=1;fontColor=#b85450;strokeColor=#b85450;" edge="1" parent="1" source="decR" target="retry"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- SQS redelivery / DLQ -->
+        <mxCell id="sqsBack" value="SQS reintrega el mensaje&#10;(ReportBatchItemFailures)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCE4F1;strokeColor=#E7157B;fontColor=#232F3E;fontSize=11;" vertex="1" parent="1"><mxGeometry x="700" y="260" width="220" height="80" as="geometry"/></mxCell>
+        <mxCell id="eSqsBack" value="" style="endArrow=classic;html=1;strokeColor=#E7157B;" edge="1" parent="1" source="retry" target="sqsBack"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="dlqDec" value="¿superó maxReceiveCount=5?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FCE4F1;strokeColor=#E7157B;fontColor=#232F3E;fontSize=11;" vertex="1" parent="1"><mxGeometry x="430" y="255" width="210" height="90" as="geometry"/></mxCell>
+        <mxCell id="eDlqDec" value="" style="endArrow=classic;html=1;strokeColor=#E7157B;" edge="1" parent="1" source="sqsBack" target="dlqDec"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="reproc" value="Reintenta (vuelve a la cola)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF8E1;strokeColor=#C9A000;fontColor=#6b5200;fontSize=11;" vertex="1" parent="1"><mxGeometry x="440" y="330" width="190" height="50" as="geometry"/></mxCell>
+        <mxCell id="eReproc" value="no" style="endArrow=classic;html=1;fontColor=#555;" edge="1" parent="1" source="dlqDec" target="reproc"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eReprocBack" value="" style="endArrow=classic;html=1;dashed=1;strokeColor=#C9A000;exitX=0;exitY=0.5;entryX=0;entryY=1;" edge="1" parent="1" source="reproc" target="dec"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="360" y="355"/><mxPoint x="360" y="270"/></Array></mxGeometry></mxCell>
+
+        <mxCell id="dlq" value="" style="sketch=0;outlineConnect=0;fillColor=#E7157B;strokeColor=none;html=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=11;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.simple_queue_service;" vertex="1" parent="1"><mxGeometry x="150" y="320" width="60" height="60" as="geometry"/></mxCell>
+        <mxCell id="dlqT" value="&lt;b&gt;DLQ&lt;/b&gt;&#10;breb-poc-dlq&#10;no procesable (0 pérdidas, se inspecciona)" style="text;html=1;align=center;fontSize=10;fontColor=#555;" vertex="1" parent="1"><mxGeometry x="100" y="382" width="170" height="44" as="geometry"/></mxCell>
+        <mxCell id="eDlq" value="sí → a la DLQ" style="endArrow=classic;html=1;fontColor=#E7157B;strokeColor=#E7157B;" edge="1" parent="1" source="dlqDec" target="dlq"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- Rama DUPLICADO -->
+        <mxCell id="dupBox" value="Clave DUPLICADA&#10;ConditionalCheckFailedException&#10;→ log: &quot;duplicate_skipped&quot;&#10;→ NO se invoca el backend" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#2d6a2d;fontColor=#1b4d1b;fontSize=12;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="360" y="470" width="270" height="100" as="geometry"/></mxCell>
+        <mxCell id="eDup" value="falla condición (ya existe P)" style="endArrow=classic;html=1;fontColor=#2d6a2d;strokeColor=#2d6a2d;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="dec" target="dupBox"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="dupResult" value="El pago con payment_id = P se ejecuta UNA sola vez, sin importar cuántas veces&#10;se reentregue el mensaje (reintentos de SQS, doble entrega at-least-once o&#10;duplicado del productor). Garantía exactamente-una-vez → ASR-2 cumplido." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#2d6a2d;fontColor=#1b4d1b;fontSize=11;align=left;spacingLeft=10;" vertex="1" parent="1"><mxGeometry x="700" y="470" width="730" height="100" as="geometry"/></mxCell>
+
+        <!-- DynamoDB item illustration -->
+        <mxCell id="ddbIcon" value="" style="sketch=0;outlineConnect=0;fillColor=#2E27AD;strokeColor=none;html=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=11;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.dynamodb;" vertex="1" parent="1"><mxGeometry x="150" y="640" width="60" height="60" as="geometry"/></mxCell>
+        <mxCell id="ddbItem" value="Tabla breb-poc-idempotency (ejemplo de item):&#10;payment_key = demo-inv-001 · status = DONE · created_at · done_at · expires_at (TTL)" style="text;html=1;align=left;fontSize=11;fontColor=#232F3E;fillColor=#F3F2FC;strokeColor=#2E27AD;spacingLeft=10;verticalAlign=middle;" vertex="1" parent="1"><mxGeometry x="240" y="645" width="1190" height="50" as="geometry"/></mxCell>
+
+        <mxCell id="foot" value="Clave: el PutItem condicional es atómico — dos entregas concurrentes del mismo payment_id no pueden tener éxito ambas. Ni se pierde (DLQ) ni se duplica (idempotencia)." style="text;html=1;align=center;fontStyle=2;fontColor=#2d6a2d;fontSize=12;" vertex="1" parent="1"><mxGeometry x="250" y="720" width="1200" height="24" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,62 @@
+<mxfile host="app.diagrams.net" agent="Kiro" version="24.0.0">
+  <diagram name="PoC Secuencia" id="poc-seq">
+    <mxGraphModel dx="1600" dy="1000" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1050" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <mxCell id="title" value="PoC Bre-B · Flujo de procesamiento de un pago programado (secuencia end-to-end)&#10;Valida ASR-1 (desempeño en ventana) y ASR-2 (0 pérdidas / 0 duplicados)" style="text;html=1;align=center;fontSize=16;fontStyle=1;fontColor=#232F3E;" vertex="1" parent="1"><mxGeometry x="250" y="16" width="1200" height="44" as="geometry"/></mxCell>
+        <mxCell id="sub" value="Cuenta aftc_test (803647807230) · Región us-east-2 (Ohio) · Verificado end-to-end el 2026-10-28" style="text;html=1;align=center;fontSize=11;fontStyle=2;fontColor=#555;" vertex="1" parent="1"><mxGeometry x="250" y="60" width="1200" height="20" as="geometry"/></mxCell>
+
+        <!-- Lifelines headers -->
+        <mxCell id="hLoad" value="" style="sketch=0;outlineConnect=0;fillColor=#C925D1;strokeColor=none;html=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=11;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.distributed_load_testing;" vertex="1" parent="1"><mxGeometry x="120" y="110" width="60" height="60" as="geometry"/></mxCell>
+        <mxCell id="hLoadT" value="&lt;b&gt;load_cli.sh&lt;/b&gt;&#10;(AWS CLI)" style="text;html=1;align=center;fontSize=10;fontColor=#555;" vertex="1" parent="1"><mxGeometry x="90" y="172" width="120" height="30" as="geometry"/></mxCell>
+
+        <mxCell id="hSqs" value="" style="sketch=0;outlineConnect=0;fillColor=#E7157B;strokeColor=none;html=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=11;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.simple_queue_service;" vertex="1" parent="1"><mxGeometry x="400" y="110" width="60" height="60" as="geometry"/></mxCell>
+        <mxCell id="hSqsT" value="&lt;b&gt;SQS&lt;/b&gt;&#10;breb-poc-queue" style="text;html=1;align=center;fontSize=10;fontColor=#555;" vertex="1" parent="1"><mxGeometry x="370" y="172" width="120" height="30" as="geometry"/></mxCell>
+
+        <mxCell id="hLam" value="" style="sketch=0;outlineConnect=0;fillColor=#ED7100;strokeColor=none;html=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=11;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;" vertex="1" parent="1"><mxGeometry x="700" y="110" width="60" height="60" as="geometry"/></mxCell>
+        <mxCell id="hLamT" value="&lt;b&gt;Lambda consumer&lt;/b&gt;&#10;breb-poc-consumer" style="text;html=1;align=center;fontSize=10;fontColor=#555;" vertex="1" parent="1"><mxGeometry x="665" y="172" width="130" height="30" as="geometry"/></mxCell>
+
+        <mxCell id="hDdb" value="" style="sketch=0;outlineConnect=0;fillColor=#2E27AD;strokeColor=none;html=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=11;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.dynamodb;" vertex="1" parent="1"><mxGeometry x="1010" y="110" width="60" height="60" as="geometry"/></mxCell>
+        <mxCell id="hDdbT" value="&lt;b&gt;DynamoDB&lt;/b&gt;&#10;breb-poc-idempotency" style="text;html=1;align=center;fontSize=10;fontColor=#555;" vertex="1" parent="1"><mxGeometry x="975" y="172" width="130" height="30" as="geometry"/></mxCell>
+
+        <mxCell id="hStub" value="" style="sketch=0;outlineConnect=0;fillColor=#ED7100;strokeColor=none;html=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=11;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;" vertex="1" parent="1"><mxGeometry x="1340" y="110" width="60" height="60" as="geometry"/></mxCell>
+        <mxCell id="hStubT" value="&lt;b&gt;Lambda stub backend&lt;/b&gt;&#10;breb-poc-stub-backend" style="text;html=1;align=center;fontSize=10;fontColor=#555;" vertex="1" parent="1"><mxGeometry x="1305" y="172" width="130" height="30" as="geometry"/></mxCell>
+
+        <!-- Lifelines (dashed vertical) -->
+        <mxCell id="llLoad" value="" style="endArrow=none;html=1;dashed=1;strokeColor=#9673a6;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="150" y="210" as="sourcePoint"/><mxPoint x="150" y="980" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="llSqs" value="" style="endArrow=none;html=1;dashed=1;strokeColor=#E7157B;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="430" y="210" as="sourcePoint"/><mxPoint x="430" y="980" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="llLam" value="" style="endArrow=none;html=1;dashed=1;strokeColor=#ED7100;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="730" y="210" as="sourcePoint"/><mxPoint x="730" y="980" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="llDdb" value="" style="endArrow=none;html=1;dashed=1;strokeColor=#2E27AD;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1040" y="210" as="sourcePoint"/><mxPoint x="1040" y="980" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="llStub" value="" style="endArrow=none;html=1;dashed=1;strokeColor=#ED7100;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1370" y="210" as="sourcePoint"/><mxPoint x="1370" y="980" as="targetPoint"/></mxGeometry></mxCell>
+
+        <!-- Messages -->
+        <mxCell id="m1" value="1 · SendMessageBatch (payment_id, amount, llave Bre-B...)" style="endArrow=classic;html=1;fontColor=#232F3E;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="150" y="250" as="sourcePoint"/><mxPoint x="430" y="250" as="targetPoint"/></mxGeometry></mxCell>
+
+        <mxCell id="m2" value="2 · Event source mapping entrega el lote (batch=10, max_concurrency=2)" style="endArrow=classic;html=1;fontColor=#232F3E;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="430" y="300" as="sourcePoint"/><mxPoint x="730" y="300" as="targetPoint"/></mxGeometry></mxCell>
+
+        <mxCell id="m3" value="3 · PutItem condicional (attribute_not_exists) → reserva clave" style="endArrow=classic;html=1;fontColor=#2E27AD;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="730" y="350" as="sourcePoint"/><mxPoint x="1040" y="350" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m3r" value="OK (status=PROCESSING, TTL)  /  ConditionalCheckFailed → duplicado" style="endArrow=open;html=1;dashed=1;fontColor=#2E27AD;fontSize=10;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1040" y="385" as="sourcePoint"/><mxPoint x="730" y="385" as="targetPoint"/></mxGeometry></mxCell>
+
+        <mxCell id="m4" value="4 · invoke (lambda:InvokeFunction, RequestResponse) — NO Function URL" style="endArrow=classic;html=1;fontColor=#ED7100;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="730" y="440" as="sourcePoint"/><mxPoint x="1370" y="440" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m4r" value="200 EXECUTED  (5% → 503 TRANSIENT_ERROR)" style="endArrow=open;html=1;dashed=1;fontColor=#ED7100;fontSize=10;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1370" y="475" as="sourcePoint"/><mxPoint x="730" y="475" as="targetPoint"/></mxGeometry></mxCell>
+
+        <!-- retry note -->
+        <mxCell id="retry" value="Si 503/timeout: reintento con backoff exponencial (0.2s·2^n, hasta 3). Agotados → excepción → SQS reintrega; tras maxReceiveCount=5 → DLQ." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FDF3E7;strokeColor=#ED7100;fontColor=#8a4b00;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1"><mxGeometry x="760" y="500" width="580" height="50" as="geometry"/></mxCell>
+
+        <mxCell id="m5" value="5 · UpdateItem status=DONE, done_at" style="endArrow=classic;html=1;fontColor=#2E27AD;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="730" y="590" as="sourcePoint"/><mxPoint x="1040" y="590" as="targetPoint"/></mxGeometry></mxCell>
+
+        <mxCell id="m6" value="6 · return batchItemFailures = [] (lote confirmado, mensajes borrados de SQS)" style="endArrow=classic;html=1;fontColor=#232F3E;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="730" y="640" as="sourcePoint"/><mxPoint x="430" y="640" as="targetPoint"/></mxGeometry></mxCell>
+
+        <!-- Duplicate branch -->
+        <mxCell id="dupBox" value="Rama de duplicado (ASR-2): si el payment_id ya existe, el consumer registra &quot;duplicate_skipped&quot; y NO invoca el backend → el pago no se ejecuta dos veces." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#2d6a2d;fontColor=#2d6a2d;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1"><mxGeometry x="120" y="700" width="700" height="50" as="geometry"/></mxCell>
+
+        <!-- Observability note -->
+        <mxCell id="obs" value="Observabilidad transversal: cada paso emite métricas a CloudWatch (Invocations, Duration p95, Errors, backlog SQS) y trazas a AWS X-Ray (segmento consumer → subsegmento invoke stub → DynamoDB)." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E9FB;strokeColor=#7D3C98;fontColor=#5b2c6f;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1"><mxGeometry x="120" y="770" width="1250" height="46" as="geometry"/></mxCell>
+
+        <mxCell id="foot" value="Resultado verificado: escenario normal → 100% mensajes &quot;processed&quot;, cola drenada a 0, item demo-inv-001 con status=DONE en DynamoDB. ASR-1 y ASR-2 cumplidos." style="text;html=1;align=center;fontStyle=2;fontColor=#2d6a2d;fontSize=12;" vertex="1" parent="1"><mxGeometry x="250" y="840" width="1200" height="24" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

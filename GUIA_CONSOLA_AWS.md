@@ -121,9 +121,30 @@ Es la mejor vista para contar la historia completa en una sola pantalla.
 2. **SQS** → enviar un pago de prueba (sección 2) con un `payment_id` nuevo.
 3. **Lambda consumer → logs** (sección 3.2) → mostrar la línea `processed`.
 4. **DynamoDB** (sección 4) → mostrar el ítem con `status = DONE`.
-5. (Si se corrió carga k6) **CloudWatch Dashboard** (sección 1) → mostrar el pico
-   de la cola llenándose y drenándose de forma controlada, y la DLQ en 0.
+5. (Si se corrió carga con `load/load_cli.sh`) **CloudWatch Dashboard** (sección 1) →
+   mostrar el pico de la cola llenándose y drenándose de forma controlada, y la DLQ en 0.
 6. **X-Ray** (sección 5) → mostrar la traza consumer → stub → DynamoDB.
 
 > Mensaje de cierre: ningún pago se pierde (DLQ + reintentos) y ninguno se duplica
 > (idempotencia en DynamoDB), incluso bajo el pico de las 6:00 a.m.
+
+---
+
+## 8. Ejecutar el experimento completo (CloudShell)
+
+Para **correr** la carga (no solo mostrar lo ya corrido), sigue el runbook paso a paso
+**`RUNBOOK_EXPERIMENTO.md`**: entrar a AWS, abrir CloudShell, `terraform apply`,
+purgar colas, lanzar los 3 escenarios con `load/load_cli.sh` y verificar los criterios
+de éxito. Resumen de comandos:
+
+```bash
+cd ~/ArquitecturaCloudPoc && git pull
+cd terraform && terraform apply -auto-approve
+export AWS_REGION=us-east-2
+export QUEUE_URL=$(terraform output -raw queue_url)
+cd ../load
+./load_cli.sh 2000 normal      # ASR-1 nominal
+./load_cli.sh 6000 stress      # pico 6:00 a.m.
+./load_cli.sh 2000 fault 25    # ASR-2: fallo + duplicados
+cd .. && ./scripts/verify.sh   # resumen de criterios de éxito
+```

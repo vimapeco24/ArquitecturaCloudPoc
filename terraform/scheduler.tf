@@ -1,7 +1,8 @@
 # ---------------------------------------------------------------------------
 # EventBridge Scheduler (opcional) — dispara un lote a hora fija (simula 6:00 a.m.)
-# Para la PoC, la carga principal se inyecta con k6 (control fino del volumen).
-# Este scheduler demuestra el disparo programado del lote real.
+# Para la PoC, la carga principal se inyecta con load/load_cli.sh (AWS CLI), que
+# da control fino del volumen de cada escenario. Este scheduler demuestra el
+# disparo programado del lote real en producción (deshabilitado por defecto).
 # ---------------------------------------------------------------------------
 
 data "aws_iam_policy_document" "scheduler_assume" {

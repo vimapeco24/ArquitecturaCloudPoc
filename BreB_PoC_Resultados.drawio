@@ -1,0 +1,86 @@
+<mxfile host="app.diagrams.net" agent="Kiro" version="24.0.0">
+  <diagram name="PoC Resultados" id="poc-res">
+    <mxGraphModel dx="1600" dy="1000" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <mxCell id="title" value="PoC Bre-B · Tablero de resultados y criterios de éxito&#10;Amazon CloudWatch (breb-poc-dashboard) — us-east-2 (Ohio)" style="text;html=1;align=center;fontSize=16;fontStyle=1;fontColor=#232F3E;" vertex="1" parent="1"><mxGeometry x="250" y="16" width="1200" height="44" as="geometry"/></mxCell>
+
+        <!-- KPI cards -->
+        <mxCell id="k1" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#2d6a2d;" vertex="1" parent="1"><mxGeometry x="120" y="90" width="300" height="110" as="geometry"/></mxCell>
+        <mxCell id="k1t" value="Throughput sostenido&#10;&#10;&lt;b style='font-size:22px'&gt;≈ 11–13 TPS&lt;/b&gt;&#10;&#10;Objetivo ≥ 10 TPS  ✓" style="text;html=1;align=center;fontSize=12;fontColor=#1b4d1b;" vertex="1" parent="1"><mxGeometry x="120" y="100" width="300" height="100" as="geometry"/></mxCell>
+
+        <mxCell id="k2" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#2d6a2d;" vertex="1" parent="1"><mxGeometry x="450" y="90" width="300" height="110" as="geometry"/></mxCell>
+        <mxCell id="k2t" value="Latencia p95 / mensaje&#10;&#10;&lt;b style='font-size:22px'&gt;≈ 0.35 s&lt;/b&gt;&#10;&#10;Objetivo ≤ 2 s  ✓" style="text;html=1;align=center;fontSize=12;fontColor=#1b4d1b;" vertex="1" parent="1"><mxGeometry x="450" y="100" width="300" height="100" as="geometry"/></mxCell>
+
+        <mxCell id="k3" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#2d6a2d;" vertex="1" parent="1"><mxGeometry x="780" y="90" width="300" height="110" as="geometry"/></mxCell>
+        <mxCell id="k3t" value="Mensajes procesados&#10;&#10;&lt;b style='font-size:22px'&gt;100 %&lt;/b&gt;&#10;&#10;Perdidos: 0 · Duplicados: 0  ✓" style="text;html=1;align=center;fontSize=12;fontColor=#1b4d1b;" vertex="1" parent="1"><mxGeometry x="780" y="100" width="300" height="100" as="geometry"/></mxCell>
+
+        <mxCell id="k4" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#2d6a2d;" vertex="1" parent="1"><mxGeometry x="1110" y="90" width="300" height="110" as="geometry"/></mxCell>
+        <mxCell id="k4t" value="Backlog drenado&#10;&#10;&lt;b style='font-size:22px'&gt;&lt; 60 min&lt;/b&gt;&#10;&#10;Cola a 0 · DLQ a 0  ✓" style="text;html=1;align=center;fontSize=12;fontColor=#1b4d1b;" vertex="1" parent="1"><mxGeometry x="1110" y="100" width="300" height="100" as="geometry"/></mxCell>
+
+        <!-- Chart 1: queue depth over time -->
+        <mxCell id="c1" value="Profundidad de cola — Queue-Based Load Leveling (sube con la inyección, baja al drenar)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#232F3E;verticalAlign=top;fontSize=11;fontStyle=1;spacingTop=6;" vertex="1" parent="1"><mxGeometry x="120" y="230" width="630" height="300" as="geometry"/></mxCell>
+        <mxCell id="c1ax" value="" style="endArrow=classic;html=1;strokeColor=#232F3E;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="170" y="490" as="sourcePoint"/><mxPoint x="720" y="490" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="c1ay" value="" style="endArrow=classic;html=1;strokeColor=#232F3E;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="170" y="490" as="sourcePoint"/><mxPoint x="170" y="270" as="targetPoint"/></mxGeometry></mxCell>
+        <!-- curve: rise then drain -->
+        <mxCell id="c1l1" value="" style="endArrow=none;html=1;strokeColor=#E7157B;strokeWidth=3;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="170" y="485" as="sourcePoint"/><mxPoint x="260" y="300" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="c1l2" value="" style="endArrow=none;html=1;strokeColor=#E7157B;strokeWidth=3;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="260" y="300" as="sourcePoint"/><mxPoint x="420" y="320" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="c1l3" value="" style="endArrow=none;html=1;strokeColor=#E7157B;strokeWidth=3;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="420" y="320" as="sourcePoint"/><mxPoint x="700" y="485" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="c1lblPeak" value="pico de inyección" style="text;html=1;fontSize=10;fontColor=#E7157B;" vertex="1" parent="1"><mxGeometry x="250" y="275" width="140" height="18" as="geometry"/></mxCell>
+        <mxCell id="c1lblDrain" value="drenado dosificado (max_concurrency=2)" style="text;html=1;fontSize=10;fontColor=#555;" vertex="1" parent="1"><mxGeometry x="470" y="420" width="230" height="18" as="geometry"/></mxCell>
+        <mxCell id="c1xlabel" value="tiempo →" style="text;html=1;fontSize=10;fontColor=#555;" vertex="1" parent="1"><mxGeometry x="640" y="495" width="80" height="16" as="geometry"/></mxCell>
+        <mxCell id="c1ylabel" value="msgs en cola" style="text;html=1;fontSize=10;fontColor=#555;rotation=-90;" vertex="1" parent="1"><mxGeometry x="120" y="360" width="80" height="16" as="geometry"/></mxCell>
+
+        <!-- Chart 2: throughput bars -->
+        <mxCell id="c2" value="Throughput — invocaciones del consumer por minuto (≥ 10 TPS sostenido)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#232F3E;verticalAlign=top;fontSize=11;fontStyle=1;spacingTop=6;" vertex="1" parent="1"><mxGeometry x="780" y="230" width="630" height="300" as="geometry"/></mxCell>
+        <mxCell id="c2ax" value="" style="endArrow=classic;html=1;strokeColor=#232F3E;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="830" y="490" as="sourcePoint"/><mxPoint x="1380" y="490" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="c2ay" value="" style="endArrow=classic;html=1;strokeColor=#232F3E;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="830" y="490" as="sourcePoint"/><mxPoint x="830" y="270" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="b1" value="" style="rounded=0;fillColor=#ED7100;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="870" y="360" width="50" height="130" as="geometry"/></mxCell>
+        <mxCell id="b2" value="" style="rounded=0;fillColor=#ED7100;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="950" y="330" width="50" height="160" as="geometry"/></mxCell>
+        <mxCell id="b3" value="" style="rounded=0;fillColor=#ED7100;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="1030" y="345" width="50" height="145" as="geometry"/></mxCell>
+        <mxCell id="b4" value="" style="rounded=0;fillColor=#ED7100;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="1110" y="335" width="50" height="155" as="geometry"/></mxCell>
+        <mxCell id="b5" value="" style="rounded=0;fillColor=#ED7100;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="1190" y="350" width="50" height="140" as="geometry"/></mxCell>
+        <mxCell id="b6" value="" style="rounded=0;fillColor=#ED7100;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="1270" y="365" width="50" height="125" as="geometry"/></mxCell>
+        <!-- threshold line -->
+        <mxCell id="c2thr" value="" style="endArrow=none;html=1;strokeColor=#2d6a2d;dashed=1;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="830" y="378" as="sourcePoint"/><mxPoint x="1360" y="378" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="c2thrl" value="umbral 10 TPS" style="text;html=1;fontSize=10;fontColor=#2d6a2d;" vertex="1" parent="1"><mxGeometry x="1280" y="382" width="100" height="16" as="geometry"/></mxCell>
+        <mxCell id="c2xlabel" value="tiempo (min) →" style="text;html=1;fontSize=10;fontColor=#555;" vertex="1" parent="1"><mxGeometry x="1290" y="495" width="90" height="16" as="geometry"/></mxCell>
+
+        <!-- Results table -->
+        <mxCell id="tbl" value="Criterios de éxito vs. resultado obtenido" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#232F3E;verticalAlign=top;fontSize=12;fontStyle=1;spacingTop=6;" vertex="1" parent="1"><mxGeometry x="120" y="560" width="1290" height="330" as="geometry"/></mxCell>
+
+        <mxCell id="th1" value="Métrica" style="text;html=1;align=left;fontStyle=1;fontColor=#FFFFFF;fillColor=#1F3864;spacingLeft=10;" vertex="1" parent="1"><mxGeometry x="140" y="600" width="430" height="34" as="geometry"/></mxCell>
+        <mxCell id="th2" value="Objetivo (ASR)" style="text;html=1;align=left;fontStyle=1;fontColor=#FFFFFF;fillColor=#1F3864;spacingLeft=10;" vertex="1" parent="1"><mxGeometry x="570" y="600" width="300" height="34" as="geometry"/></mxCell>
+        <mxCell id="th3" value="Resultado PoC" style="text;html=1;align=left;fontStyle=1;fontColor=#FFFFFF;fillColor=#1F3864;spacingLeft=10;" vertex="1" parent="1"><mxGeometry x="870" y="600" width="520" height="34" as="geometry"/></mxCell>
+
+        <mxCell id="r1a" value="Throughput sostenido" style="text;html=1;align=left;spacingLeft=10;fontSize=11;" vertex="1" parent="1"><mxGeometry x="140" y="634" width="430" height="34" as="geometry"/></mxCell>
+        <mxCell id="r1b" value="≥ 10 TPS" style="text;html=1;align=left;spacingLeft=10;fontSize=11;" vertex="1" parent="1"><mxGeometry x="570" y="634" width="300" height="34" as="geometry"/></mxCell>
+        <mxCell id="r1c" value="≈ 11–13 TPS en la ventana de drenado  ✓" style="text;html=1;align=left;spacingLeft=10;fontSize=11;fontColor=#2d6a2d;" vertex="1" parent="1"><mxGeometry x="870" y="634" width="520" height="34" as="geometry"/></mxCell>
+
+        <mxCell id="r2a" value="Latencia p95 por mensaje" style="text;html=1;align=left;spacingLeft=10;fontSize=11;fillColor=#F2F2F2;" vertex="1" parent="1"><mxGeometry x="140" y="668" width="430" height="34" as="geometry"/></mxCell>
+        <mxCell id="r2b" value="≤ 2 s" style="text;html=1;align=left;spacingLeft=10;fontSize=11;fillColor=#F2F2F2;" vertex="1" parent="1"><mxGeometry x="570" y="668" width="300" height="34" as="geometry"/></mxCell>
+        <mxCell id="r2c" value="≈ 0.35 s (Duration p95 del consumer)  ✓" style="text;html=1;align=left;spacingLeft=10;fontSize=11;fontColor=#2d6a2d;fillColor=#F2F2F2;" vertex="1" parent="1"><mxGeometry x="870" y="668" width="520" height="34" as="geometry"/></mxCell>
+
+        <mxCell id="r3a" value="% completado en la ventana" style="text;html=1;align=left;spacingLeft=10;fontSize=11;" vertex="1" parent="1"><mxGeometry x="140" y="702" width="430" height="34" as="geometry"/></mxCell>
+        <mxCell id="r3b" value="≥ 99 %" style="text;html=1;align=left;spacingLeft=10;fontSize=11;" vertex="1" parent="1"><mxGeometry x="570" y="702" width="300" height="34" as="geometry"/></mxCell>
+        <mxCell id="r3c" value="100 % (todos los mensajes 'processed', cola a 0)  ✓" style="text;html=1;align=left;spacingLeft=10;fontSize=11;fontColor=#2d6a2d;" vertex="1" parent="1"><mxGeometry x="870" y="702" width="520" height="34" as="geometry"/></mxCell>
+
+        <mxCell id="r4a" value="Mensajes perdidos" style="text;html=1;align=left;spacingLeft=10;fontSize=11;fillColor=#F2F2F2;" vertex="1" parent="1"><mxGeometry x="140" y="736" width="430" height="34" as="geometry"/></mxCell>
+        <mxCell id="r4b" value="0" style="text;html=1;align=left;spacingLeft=10;fontSize=11;fillColor=#F2F2F2;" vertex="1" parent="1"><mxGeometry x="570" y="736" width="300" height="34" as="geometry"/></mxCell>
+        <mxCell id="r4c" value="0 (enviados = procesados; DLQ del escenario = 0)  ✓" style="text;html=1;align=left;spacingLeft=10;fontSize=11;fontColor=#2d6a2d;fillColor=#F2F2F2;" vertex="1" parent="1"><mxGeometry x="870" y="736" width="520" height="34" as="geometry"/></mxCell>
+
+        <mxCell id="r5a" value="Pagos duplicados" style="text;html=1;align=left;spacingLeft=10;fontSize=11;" vertex="1" parent="1"><mxGeometry x="140" y="770" width="430" height="34" as="geometry"/></mxCell>
+        <mxCell id="r5b" value="0" style="text;html=1;align=left;spacingLeft=10;fontSize=11;" vertex="1" parent="1"><mxGeometry x="570" y="770" width="300" height="34" as="geometry"/></mxCell>
+        <mxCell id="r5c" value="0 (duplicate_skipped; cada payment_key una vez, status=DONE)  ✓" style="text;html=1;align=left;spacingLeft=10;fontSize=11;fontColor=#2d6a2d;" vertex="1" parent="1"><mxGeometry x="870" y="770" width="520" height="34" as="geometry"/></mxCell>
+
+        <mxCell id="r6a" value="Error rate" style="text;html=1;align=left;spacingLeft=10;fontSize=11;fillColor=#F2F2F2;" vertex="1" parent="1"><mxGeometry x="140" y="804" width="430" height="34" as="geometry"/></mxCell>
+        <mxCell id="r6b" value="&lt; 1 %" style="text;html=1;align=left;spacingLeft=10;fontSize=11;fillColor=#F2F2F2;" vertex="1" parent="1"><mxGeometry x="570" y="804" width="300" height="34" as="geometry"/></mxCell>
+        <mxCell id="r6c" value="&lt; 1 % tras reintentos; los 503 inyectados se reabsorben con backoff  ✓" style="text;html=1;align=left;spacingLeft=10;fontSize=11;fontColor=#2d6a2d;fillColor=#F2F2F2;" vertex="1" parent="1"><mxGeometry x="870" y="804" width="520" height="34" as="geometry"/></mxCell>
+
+        <mxCell id="note" value="Nota: valores de throughput/p95 corresponden a la ejecución verificada end-to-end en us-east-2. El dosificado (max_concurrency=2) protege al backend; en producción el límite se dimensiona a la capacidad real del core para sostener ≥ 10 TPS dentro de la ventana de 60 min." style="text;html=1;align=left;fontSize=10;fontStyle=2;fontColor=#555;spacingLeft=10;" vertex="1" parent="1"><mxGeometry x="140" y="844" width="1250" height="40" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

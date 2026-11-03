@@ -1,7 +1,7 @@
 variable "aws_region" {
   description = "Región AWS donde se despliega la PoC."
   type        = string
-  default     = "us-east-1"
+  default     = "us-east-2" # Ohio: región usada en el despliegue verificado de la PoC.
 }
 
 variable "name_prefix" {

@@ -8,7 +8,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT/terraform"
 
-REGION="$(terraform output -raw -state=terraform.tfstate 2>/dev/null >/dev/null; echo "${AWS_REGION:-us-east-1}")"
+REGION="${AWS_REGION:-us-east-2}"
 QUEUE_URL="$(terraform output -raw queue_url)"
 DLQ_URL="$(terraform output -raw dlq_url)"
 TABLE="$(terraform output -raw idempotency_table)"

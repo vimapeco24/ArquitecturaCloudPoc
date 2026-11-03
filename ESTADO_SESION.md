@@ -294,3 +294,49 @@ k6 run normal.js
 Mientras corre, observar en CloudWatch (dashboard `breb-poc-dashboard`):
 ApproximateNumberOfMessagesVisible (cola subiendo y bajando = buffering),
 invocaciones concurrentes del consumer (dosificadas), y DLQ en 0.
+
+## Sesión 2026-11-03 — Evidencias en el Word + coherencia del repo
+
+Objetivo: dejar la entrega "muy completa para generar el experimento".
+
+### Diagramas de evidencia NUEVOS (drawio + PNG, íconos AWS oficiales)
+Creados en `221026/poc-breb-aws/` y exportados a PNG con la CLI de drawio (-s 2):
+- `BreB_PoC_Secuencia.(drawio|png)` — secuencia end-to-end del flujo de un pago
+  (SendMessageBatch → event source mapping batch=10/max_concurrency=2 → PutItem
+  condicional → invoke stub por API de Lambda → UpdateItem DONE → batchItemFailures;
+  nota de reintentos/backoff/DLQ y observabilidad CloudWatch+X-Ray).
+- `BreB_PoC_Resultados.(drawio|png)` — tablero tipo dashboard: KPIs (≈11–13 TPS,
+  p95 ≈0.35 s, 100% procesado, backlog <60 min), gráfico de profundidad de cola
+  (Queue-Based Load Leveling), barras de throughput con umbral 10 TPS y tabla
+  criterios de éxito vs resultado (todos ✓).
+- `BreB_PoC_Idempotencia.(drawio|png)` — flujo ASR-2: PutItem condicional atómico,
+  rama duplicado (duplicate_skipped, no invoca backend), rama fallo → reintentos →
+  DLQ tras maxReceiveCount=5; item ejemplo demo-inv-001 status=DONE.
+
+### Documento Word (221026/GloMo - Pagos recurrentes Bre B.docx)
+- Insertadas 3 figuras en la sección 17 (PoC), con caption centrado en cursiva:
+  - **Figura 13** (secuencia) tras la Figura 12 en 17.1.
+  - **Figura 14** (tablero de resultados) en 17.3, tras "Resultado obtenido…".
+  - **Figura 15** (idempotencia ASR-2) en 17.4, tras "La evidencia de la ejecución…".
+- Técnica: PNG copiados a word/media/ (image17/18/19.png), relaciones rId50/51/52
+  en document.xml.rels, bloques <w:drawing> (ancho 5760720 EMU) insertados tras el
+  párrafo ancla. XML validado bien formado, sin rels rotas ni entradas duplicadas.
+- Corregida TOC: "17.3 Métricas y resultados esperados" → "obtenidos" (coincide con
+  el cuerpo). Acentos corregidos en los captions.
+- Backups creados: `GloMo - Pagos recurrentes Bre B_BACKUP_pre_figuras_*.docx`.
+- PDF regenerado con LibreOffice (soffice) sin errores; `GloMo ... .pdf` actualizado
+  (backup `..._BACKUP_pre_figuras.pdf`).
+
+### Coherencia del repo (realidad desplegada = us-east-2, load_cli.sh, invoke API)
+- `terraform/variables.tf`: default `aws_region` = us-east-2 (antes us-east-1).
+- `terraform/terraform.tfvars.example`: región us-east-2; reserved_concurrency=2 con
+  nota (sandbox=2, producción=20).
+- `terraform/outputs.tf` y `scheduler.tf`: comentarios actualizados (k6 → load_cli.sh).
+- `README.md`: estado DESPLEGADO/VERIFICADO, región us-east-2, ejecución con
+  load_cli.sh (normal/stress/fault), nota del 403/invoke por API de Lambda, y
+  referencia a los 4 diagramas de la PoC.
+
+### Pendiente real (fuera de este entorno, en CloudShell)
+- Correr `./load_cli.sh 2000 normal`, `6000 stress`, `2000 fault 25` y capturar el
+  dashboard real (opcional: reemplazar las figuras ilustrativas por capturas reales).
+- Reemplazar el enlace del video en 17.4 por el definitivo.
