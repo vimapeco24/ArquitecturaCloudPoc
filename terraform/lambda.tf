@@ -89,8 +89,9 @@ resource "aws_lambda_event_source_mapping" "sqs_to_consumer" {
 
   scaling_config {
     # Dosifica el nº de invocaciones concurrentes que SQS dispara (mín. permitido=2).
-    # Este es el control efectivo de Queue-Based Load Leveling cuando la cuenta no
-    # permite reservar concurrencia a nivel de función.
-    maximum_concurrency = var.reserved_concurrency >= 2 ? var.reserved_concurrency : 2
+    # Control efectivo de Queue-Based Load Leveling cuando la cuenta no permite
+    # reservar concurrencia a nivel de función (sandbox, límite total 10).
+    # En producción se dimensiona a la capacidad real del backend transaccional.
+    maximum_concurrency = var.sqs_max_concurrency >= 2 ? var.sqs_max_concurrency : 2
   }
 }

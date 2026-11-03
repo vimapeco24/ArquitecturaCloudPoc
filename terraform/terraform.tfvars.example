@@ -4,12 +4,15 @@ aws_region  = "us-east-2"   # Ohio (región del despliegue verificado)
 name_prefix = "breb-poc"
 
 # --- Queue-Based Load Leveling ---
-# N: límite de solicitudes paralelas al backend. En cuentas sandbox cuyo límite
-# total de concurrencia es 10 (y no permiten reservar a nivel de función), deja
-# reserved_concurrency = 0: el dosificado se mantiene vía el maximum_concurrency
-# del event source mapping (mínimo 2). En producción, dimensiónalo a la capacidad
-# real del core (p. ej. 20) para sostener >= 10 TPS dentro de la ventana de 60 min.
-reserved_concurrency       = 2    # PoC sandbox. Producción: 20.
+# reserved_concurrency: concurrencia RESERVADA a nivel de función.
+#   En sandbox (límite total de concurrencia = 10) déjalo en 0: AWS no permite
+#   reservar todo el límite. El dosificado efectivo lo da sqs_max_concurrency.
+#   En producción, p. ej. 20 (dimensionado a la capacidad del backend).
+# sqs_max_concurrency: maximum_concurrency del event source mapping SQS->Lambda
+#   = nº máx. de invocaciones concurrentes (control real de Queue-Based Load Leveling).
+#   En sandbox 10 sostiene throughput alto; mínimo permitido 2.
+reserved_concurrency       = 0
+sqs_max_concurrency        = 10
 sqs_batch_size             = 10
 max_receive_count          = 5
 visibility_timeout_seconds = 60

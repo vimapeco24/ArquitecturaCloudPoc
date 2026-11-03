@@ -13,9 +13,15 @@ variable "name_prefix" {
 # --- Comportamiento del consumidor / Queue-Based Load Leveling -------------
 
 variable "reserved_concurrency" {
-  description = "Concurrencia reservada de la Lambda consumidora (N). Dosifica el ritmo hacia el backend."
+  description = "Concurrencia RESERVADA a nivel de función (reserved_concurrent_executions). En cuentas sandbox con límite total de 10, dejar en 0 (no reservar): AWS no permite reservar todo el límite. El dosificado efectivo lo da sqs_max_concurrency. En producción, p. ej. 20."
   type        = number
-  default     = 20
+  default     = 0
+}
+
+variable "sqs_max_concurrency" {
+  description = "maximum_concurrency del event source mapping SQS→Lambda: nº máx. de invocaciones concurrentes que SQS dispara (control efectivo de Queue-Based Load Leveling). Mín. permitido 2. En sandbox 10 sostiene throughput alto; en producción dimensionar al backend."
+  type        = number
+  default     = 10
 }
 
 variable "sqs_batch_size" {
