@@ -6,13 +6,13 @@
         <mxCell id="1" parent="0"/>
 
         <mxCell id="title" value="PoC Bre-B · Flujo de procesamiento de un pago programado (secuencia end-to-end)&#10;Valida ASR-1 (desempeño en ventana) y ASR-2 (0 pérdidas / 0 duplicados)" style="text;html=1;align=center;fontSize=16;fontStyle=1;fontColor=#232F3E;" vertex="1" parent="1"><mxGeometry x="250" y="16" width="1200" height="44" as="geometry"/></mxCell>
-        <mxCell id="sub" value="Cuenta aftc_test (803647807230) · Región us-east-2 (Ohio) · Verificado end-to-end el 2026-10-28" style="text;html=1;align=center;fontSize=11;fontStyle=2;fontColor=#555;" vertex="1" parent="1"><mxGeometry x="250" y="60" width="1200" height="20" as="geometry"/></mxCell>
+        <mxCell id="sub" value="Cuenta aftc_test (803647807230) · Región us-east-2 (Ohio) · Verificado end-to-end · Resultado: 76,8 TPS · p95 3 ms · 0 pérdidas · 0 duplicados" style="text;html=1;align=center;fontSize=11;fontStyle=2;fontColor=#555;" vertex="1" parent="1"><mxGeometry x="250" y="60" width="1200" height="20" as="geometry"/></mxCell>
 
         <!-- Lifelines headers -->
-        <mxCell id="hLoad" value="" style="sketch=0;outlineConnect=0;fillColor=#C925D1;strokeColor=none;html=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=11;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.distributed_load_testing;" vertex="1" parent="1"><mxGeometry x="120" y="110" width="60" height="60" as="geometry"/></mxCell>
+        <mxCell id="hLoad" value="" style="sketch=0;outlineConnect=0;fillColor=#C925D1;strokeColor=none;html=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=11;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.users;" vertex="1" parent="1"><mxGeometry x="120" y="110" width="60" height="60" as="geometry"/></mxCell>
         <mxCell id="hLoadT" value="&lt;b&gt;load_cli.sh&lt;/b&gt;&#10;(AWS CLI)" style="text;html=1;align=center;fontSize=10;fontColor=#555;" vertex="1" parent="1"><mxGeometry x="90" y="172" width="120" height="30" as="geometry"/></mxCell>
 
-        <mxCell id="hSqs" value="" style="sketch=0;outlineConnect=0;fillColor=#E7157B;strokeColor=none;html=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=11;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.simple_queue_service;" vertex="1" parent="1"><mxGeometry x="400" y="110" width="60" height="60" as="geometry"/></mxCell>
+        <mxCell id="hSqs" value="" style="sketch=0;outlineConnect=0;fillColor=#E7157B;strokeColor=none;html=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=11;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.queue;" vertex="1" parent="1"><mxGeometry x="400" y="110" width="60" height="60" as="geometry"/></mxCell>
         <mxCell id="hSqsT" value="&lt;b&gt;SQS&lt;/b&gt;&#10;breb-poc-queue" style="text;html=1;align=center;fontSize=10;fontColor=#555;" vertex="1" parent="1"><mxGeometry x="370" y="172" width="120" height="30" as="geometry"/></mxCell>
 
         <mxCell id="hLam" value="" style="sketch=0;outlineConnect=0;fillColor=#ED7100;strokeColor=none;html=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=11;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;" vertex="1" parent="1"><mxGeometry x="700" y="110" width="60" height="60" as="geometry"/></mxCell>
