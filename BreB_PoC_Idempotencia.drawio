@@ -40,7 +40,7 @@
 
         <mxCell id="eReproc" value="no → reintenta" style="endArrow=classic;html=1;dashed=1;strokeColor=#C9A000;fontColor=#8a6d00;fontSize=10;exitX=0.5;exitY=0;entryX=1;entryY=0.5;" edge="1" parent="1" source="dlqDec" target="dec"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="230" y="300"/><mxPoint x="660" y="285"/></Array></mxGeometry></mxCell>
 
-        <mxCell id="dlqIcon" value="" style="sketch=0;outlineConnect=0;fillColor=#E7157B;strokeColor=none;html=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=10;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.queue;" vertex="1" parent="1"><mxGeometry x="140" y="1000" width="60" height="60" as="geometry"/></mxCell>
+        <mxCell id="dlqIcon" value="" style="sketch=0;outlineConnect=0;fillColor=#E7157B;strokeColor=none;html=1;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=10;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.sqs;" vertex="1" parent="1"><mxGeometry x="140" y="1000" width="60" height="60" as="geometry"/></mxCell>
         <mxCell id="dlqTxt" value="&lt;b&gt;DLQ&lt;/b&gt; breb-poc-dlq&#10;no procesable (0 pérdidas, se inspecciona)" style="text;html=1;align=center;fontSize=10;fontColor=#555;" vertex="1" parent="1"><mxGeometry x="90" y="1062" width="170" height="40" as="geometry"/></mxCell>
         <mxCell id="eDlq" value="sí → a la DLQ" style="endArrow=classic;html=1;fontColor=#E7157B;strokeColor=#E7157B;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="dlqDec" target="dlqIcon"><mxGeometry relative="1" as="geometry"/></mxCell>
 
