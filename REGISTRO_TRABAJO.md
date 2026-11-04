@@ -61,7 +61,7 @@ usar `queue`, `cloudwatch`, `eventbridge`, `users`.
 - 17.3 Métricas: explicación de 3 escenarios + tabla de resultados reales +
   "Veredicto del experimento" (tabla ASR-1/ASR-2 CUMPLIDO) + Figura 14 (tablero)
 - 17.4 Evidencia: bloque con salida real (76,8 TPS, etc.) + interpretación + Figura 15 (idempotencia)
-- 17.5 Guía de ejecución (Fases 0–8) + Opción A/B de demo + Figura 16 (runbook)
+- (17.5 ELIMINADA el 2026-11-03: el runbook paso-a-paso no corresponde al documento académico; vive solo en RUNBOOK_EXPERIMENTO.md del repo. La sección PoC del Word queda en 17.1–17.4, que es lo que pide la Entrega 2.)
 
 ## Comentarios de profesores (Entrega 1) — estado
 - Volumetría: ETL + MAU → YA en tabla de volumetría (MAU ~3,2M, ETL incremental/hora).
