@@ -1,8 +1,9 @@
 # ---------------------------------------------------------------------------
-# EventBridge Scheduler (opcional) — dispara un lote a hora fija (simula 6:00 a.m.)
-# Para la PoC, la carga principal se inyecta con load/load_cli.sh (AWS CLI), que
-# da control fino del volumen de cada escenario. Este scheduler demuestra el
-# disparo programado del lote real en producción (deshabilitado por defecto).
+# EventBridge Scheduler (opcional) — dispara la máquina de estados a hora fija
+# (simula el lote de las 6:00 a.m.). Arquitectura nueva: el scheduler inicia la
+# Step Function, que genera el dataset del día y procesa los pagos con el Map
+# distribuido. Deshabilitado por defecto; para la PoC se dispara a mano con
+# scripts/run_sfn.sh (da control fino del volumen y el run_id de cada corrida).
 # ---------------------------------------------------------------------------
 
 data "aws_iam_policy_document" "scheduler_assume" {
@@ -22,11 +23,11 @@ resource "aws_iam_role" "scheduler" {
   assume_role_policy = data.aws_iam_policy_document.scheduler_assume[0].json
 }
 
-data "aws_iam_policy_document" "scheduler_send" {
+data "aws_iam_policy_document" "scheduler_start" {
   count = var.enable_scheduler ? 1 : 0
   statement {
-    actions   = ["sqs:SendMessage"]
-    resources = [aws_sqs_queue.main.arn]
+    actions   = ["states:StartExecution"]
+    resources = [aws_sfn_state_machine.pagos.arn]
   }
 }
 
@@ -34,7 +35,7 @@ resource "aws_iam_role_policy" "scheduler" {
   count  = var.enable_scheduler ? 1 : 0
   name   = "${var.name_prefix}-scheduler-policy"
   role   = aws_iam_role.scheduler[0].id
-  policy = data.aws_iam_policy_document.scheduler_send[0].json
+  policy = data.aws_iam_policy_document.scheduler_start[0].json
 }
 
 resource "aws_scheduler_schedule" "batch_kickoff" {
@@ -49,14 +50,12 @@ resource "aws_scheduler_schedule" "batch_kickoff" {
   schedule_expression_timezone = "America/Bogota"
 
   target {
-    arn      = aws_sqs_queue.main.arn
+    arn      = aws_sfn_state_machine.pagos.arn
     role_arn = aws_iam_role.scheduler[0].arn
 
-    # Mensaje "semilla" del lote. En un escenario real el disparador invocaría
-    # al productor que encola las ~20.000 ejecuciones del día.
+    # Semilla del lote: el controller usará DEFAULT_TOTAL (20.000) y un run_id propio.
     input = jsonencode({
-      payment_id = "batch-kickoff"
-      type       = "SCHEDULED_BATCH_START"
+      type = "SCHEDULED_BATCH_START"
     })
   }
 }

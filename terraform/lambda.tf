@@ -18,14 +18,14 @@ data "archive_file" "stub" {
 # ---- Stub backend transaccional (Function URL) ----------------------------
 
 resource "aws_lambda_function" "stub" {
-  function_name = "${var.name_prefix}-stub-backend"
-  role          = aws_iam_role.stub.arn
-  runtime       = "python3.12"
-  handler       = "handler.handler"
+  function_name    = "${var.name_prefix}-stub-backend"
+  role             = aws_iam_role.stub.arn
+  runtime          = "python3.12"
+  handler          = "handler.handler"
   filename         = data.archive_file.stub.output_path
   source_code_hash = data.archive_file.stub.output_base64sha256
-  timeout       = 15
-  memory_size   = 128
+  timeout          = 15
+  memory_size      = 128
 
   tracing_config {
     mode = "Active" # X-Ray
@@ -33,15 +33,15 @@ resource "aws_lambda_function" "stub" {
 
   environment {
     variables = {
-      ERROR_RATE      = tostring(var.stub_error_rate)
-      LATENCY_MIN_MS  = tostring(var.stub_latency_min_ms)
-      LATENCY_MAX_MS  = tostring(var.stub_latency_max_ms)
+      ERROR_RATE     = tostring(var.stub_error_rate)
+      LATENCY_MIN_MS = tostring(var.stub_latency_min_ms)
+      LATENCY_MAX_MS = tostring(var.stub_latency_max_ms)
     }
   }
 }
 
 resource "aws_lambda_function_url" "stub" {
-  function_name      = aws_lambda_function.stub.function_name
+  function_name = aws_lambda_function.stub.function_name
   # AWS_IAM (no NONE): la organización de la cuenta bloquea las Function URLs
   # (devuelven 403 con cualquier AuthType). La URL se mantiene por completitud,
   # pero el consumer NO la usa: invoca el stub por la API de Lambda (invoke).
@@ -51,14 +51,14 @@ resource "aws_lambda_function_url" "stub" {
 # ---- Consumidor SQS -------------------------------------------------------
 
 resource "aws_lambda_function" "consumer" {
-  function_name = "${var.name_prefix}-consumer"
-  role          = aws_iam_role.consumer.arn
-  runtime       = "python3.12"
-  handler       = "handler.handler"
+  function_name    = "${var.name_prefix}-consumer"
+  role             = aws_iam_role.consumer.arn
+  runtime          = "python3.12"
+  handler          = "handler.handler"
   filename         = data.archive_file.consumer.output_path
   source_code_hash = data.archive_file.consumer.output_base64sha256
-  timeout       = var.consumer_timeout_seconds
-  memory_size   = var.consumer_memory_mb
+  timeout          = var.consumer_timeout_seconds
+  memory_size      = var.consumer_memory_mb
 
   # Concurrencia reservada N — corazón del Queue-Based Load Leveling.
   # Si es 0, se usa -1 (sin reserva): necesario en cuentas sandbox cuyo límite

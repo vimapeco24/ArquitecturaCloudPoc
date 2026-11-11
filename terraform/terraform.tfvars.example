@@ -29,6 +29,22 @@ stub_error_rate     = 0.05
 stub_latency_min_ms = 50
 stub_latency_max_ms = 300
 
+# --- Arquitectura Step Functions + Map distribuido ---
+# sfn_total_payments: pagos que el controller genera por corrida (volumen diario del ASR).
+# sfn_max_concurrency: workers EN PARALELO del Map = control de ritmo (reemplaza la cola).
+#   ASR: máx 10 TPS procesando 20.000 en 1 h. Con latencia del core ~0.175 s,
+#   TPS ≈ concurrencia / latencia → concurrencia ≈ 2 da ~10 TPS. Default 2
+#   (cumple ASR y cabe en el límite de concurrencia 10 de la cuenta sandbox).
+#   Subir solo si se amplía el límite del core y se quiere acortar la ventana.
+# sfn_item_batch_count: pagos por invocación del worker (1 = un pago por worker).
+sfn_total_payments   = 20000
+sfn_max_concurrency  = 2
+sfn_item_batch_count = 1
+worker_timeout_seconds = 30
+worker_memory_mb       = 256
+
 # --- Scheduler (opcional) ---
+# Si enable_scheduler = true, un EventBridge Scheduler inicia la máquina de estados
+# (arquitectura nueva) a la hora de schedule_expression (simula el lote de las 6:00 a.m.).
 enable_scheduler    = false
 schedule_expression = "cron(0 6 * * ? *)"

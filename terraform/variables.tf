@@ -82,6 +82,47 @@ variable "stub_latency_max_ms" {
   default     = 300
 }
 
+# --- Arquitectura Step Functions + Distributed Map (PoC nueva) ------------
+# Reemplaza "cola SQS + consumer" por una máquina de estados con Map distribuido.
+
+variable "sfn_total_payments" {
+  description = "Nº de pagos que el controller genera por corrida (volumen diario objetivo del ASR)."
+  type        = number
+  default     = 20000
+}
+
+variable "sfn_max_concurrency" {
+  description = <<-EOT
+    MaxConcurrency del Map DISTRIBUIDO: nº máximo de workers que corren EN PARALELO.
+    Es el control que dosifica el ritmo contra el core (reemplaza el Load Leveling
+    de la cola). El ASR exige MÁX 10 TPS procesando 20.000 en una ventana de 1 h.
+    Con latencia del core ~0.175 s, TPS ≈ concurrencia / latencia; para no pasar de
+    10 TPS la concurrencia efectiva es ~2. Default 2 (cumple ASR y encaja en el
+    límite de concurrencia 10 de la cuenta sandbox). Subir solo si se amplía el
+    límite del core y se quiere acortar la ventana.
+  EOT
+  type        = number
+  default     = 2
+}
+
+variable "sfn_item_batch_count" {
+  description = "Pagos por invocación del worker (ItemBatcher del Map). 1 = un pago por worker."
+  type        = number
+  default     = 1
+}
+
+variable "worker_timeout_seconds" {
+  description = "Timeout de la Lambda worker."
+  type        = number
+  default     = 30
+}
+
+variable "worker_memory_mb" {
+  description = "Memoria de la Lambda worker."
+  type        = number
+  default     = 256
+}
+
 # --- EventBridge Scheduler (opcional) -------------------------------------
 
 variable "enable_scheduler" {

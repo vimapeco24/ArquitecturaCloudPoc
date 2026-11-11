@@ -4,20 +4,42 @@ Prueba de concepto que valida los requisitos de arquitectura significativos (ASR
 **Pagos Programados para Transferencias Inmediatas Bre-B (GloMo)**:
 
 - **ASR-1 — Desempeño en la ventana de ejecución:** la arquitectura serverless orientada a
-  eventos debe absorber el pico de las 6:00 a.m. procesando el lote dentro de la ventana de 60 min,
-  sosteniendo **≥ 10 TPS** con **p95 ≤ 2 s**.
+  eventos debe procesar el lote diario de **20.000 pagos** dentro de la ventana de **60 min**,
+  a un ritmo de **máximo 10 TPS** (tope que protege al core) con **p95 ≤ 2 s**. A 10 TPS,
+  20.000 pagos se procesan en ≈ 33 min, holgadamente dentro de la ventana.
 - **ASR-2 — Integridad (0 pérdidas / 0 duplicados):** ningún mensaje se pierde y ningún pago se
   ejecuta dos veces, incluso ante fallos transitorios del backend.
 
-El patrón central es **Queue-Based Load Leveling**: una cola (SQS) desacopla el generador del
-consumidor, y la **concurrencia del consumidor** (concurrencia reservada de Lambda en producción,
-o `maximum_concurrency` del event source mapping en la cuenta sandbox) dosifica el ritmo con el
-que el backend transaccional recibe solicitudes, protegiéndolo del pico.
+## Dos arquitecturas en este repo
 
-> **Estado:** DESPLEGADO y VERIFICADO end-to-end el 2026-10-28 en la cuenta `aftc_test`
-> (`803647807230`), región **us-east-2 (Ohio)**. Diagramas de la PoC en
-> `BreB_PoC_AWS.(drawio|png)` (arquitectura), `BreB_PoC_Secuencia.*` (flujo end-to-end),
-> `BreB_PoC_Resultados.*` (tablero de métricas) y `BreB_PoC_Idempotencia.*` (ASR-2).
+Este repositorio implementa **dos** materializaciones del mismo flujo, para comparar patrones:
+
+1. **Step Functions + Map DISTRIBUIDO (arquitectura objetivo, recomendada).**
+   Una máquina de estados orquesta todo: un **Controller** consulta/genera los 20.000 pagos del
+   día y los deja en S3; un estado **Map distribuido** los itera **en paralelo** invocando un
+   **Worker** por pago (idempotencia + llamada al core + verificación + actualización de estado).
+   **No hay cola ni Lambda disparadora**: el dosificado (Load Leveling) lo da el `MaxConcurrency`
+   del Map. Es lo que pide el ASR y lo que se lleva a la entrega. Archivos: `terraform/stepfunctions.tf`,
+   `lambda/controller/`, `lambda/worker/`, `scripts/run_sfn.sh`, `scripts/verify_sfn.sh`,
+   diagrama `BreB_PoC_SFN.(drawio|png)`.
+
+2. **SQS + Lambda consumer (baseline, Queue-Based Load Leveling).**
+   Una cola (SQS) desacopla al generador del consumidor y la **concurrencia del consumidor**
+   dosifica el ritmo. Se conserva como línea base de comparación. Archivos: `terraform/sqs.tf`,
+   `terraform/lambda.tf`, `lambda/consumer/`, `load/`, diagrama `BreB_PoC_AWS.(drawio|png)`.
+
+Ambas **comparten** el stub del core (`lambda/stub_backend/`) y la tabla de idempotencia DynamoDB.
+
+> **ASR-1 (dimensionamiento):** el objetivo es procesar **20.000 pagos** en una ventana de **1 hora**
+> a un ritmo de **máximo 10 TPS** (para proteger el core). 20.000 / 10 TPS ≈ **33 min**, dentro de la
+> ventana. En la arquitectura de Step Functions ese tope de 10 TPS se logra fijando `MaxConcurrency`
+> del Map (con latencia del core ~0.175 s, TPS ≈ concurrencia / latencia → concurrencia ≈ 2).
+
+> **Estado:** la baseline SQS está DESPLEGADA y VERIFICADA end-to-end (2026-10-28, cuenta `aftc_test`
+> `803647807230`, **us-east-2**). La arquitectura de Step Functions está **lista para desplegar**
+> (`terraform validate` OK, Lambdas compiladas y probadas). Diagramas: `BreB_PoC_SFN.*` (Step
+> Functions), `BreB_PoC_AWS.*` (baseline SQS), `BreB_PoC_Secuencia.*`, `BreB_PoC_Resultados.*`,
+> `BreB_PoC_Idempotencia.*`.
 
 ---
 
@@ -71,13 +93,19 @@ Observabilidad: CloudWatch (throughput, p95, backlog, error rate) + X-Ray (traza
 
 ```
 poc-breb-aws/
-├── terraform/          IaC: SQS + DLQ, Lambda consumidor, stub backend,
-│                       DynamoDB, EventBridge Scheduler, IAM, dashboard y alarmas
+├── terraform/          IaC. Arquitectura Step Functions: stepfunctions.tf (S3, controller,
+│                       worker, state machine con Map distribuido). Baseline SQS: sqs.tf,
+│                       lambda.tf. Compartido: dynamodb.tf, iam.tf, observability.tf (2
+│                       dashboards + alarmas), scheduler.tf (dispara la state machine), outputs.tf
 ├── lambda/
-│   ├── consumer/       Consumidor SQS: idempotencia + llamada al stub + backoff
-│   └── stub_backend/   Backend simulado (latencia + 5% de errores)
-├── load/               Scripts de carga k6 (normal, estrés, fallo transitorio)
-├── scripts/            Helpers de empaquetado, despliegue y ejecución
+│   ├── controller/     Genera/consulta los 20.000 pagos del día → dataset JSONL en S3
+│   ├── worker/         Procesa un pago en el Map distribuido: idempotencia + core + estado
+│   ├── consumer/       (baseline) Consumidor SQS: idempotencia + llamada al stub + backoff
+│   └── stub_backend/   Core bancario simulado (latencia + 5% de errores) — compartido
+├── load/               (baseline) Scripts de carga para la cola SQS
+├── scripts/            run_sfn.sh / verify_sfn.sh (Step Functions) · deploy/verify/metrics (baseline)
+├── BreB_PoC_SFN.*      Diagrama de la arquitectura Step Functions + Map distribuido
+├── BreB_PoC_AWS.*      Diagrama de la baseline SQS
 └── README.md
 ```
 
@@ -115,9 +143,42 @@ terraform apply -auto-approve
 # Terraform imprime las salidas: URL de la cola, nombre del dashboard, etc.
 ```
 
-## Ejecución de las pruebas
+## Ejecución — arquitectura Step Functions + Map distribuido (recomendada)
 
-La carga se inyecta con **`load/load_cli.sh`** (AWS CLI, `send-message-batch` en paralelo).
+Despliega y dispara el lote de las 20.000 transacciones; todo queda registrado en AWS.
+
+```bash
+cd poc-breb-aws/terraform
+terraform init
+terraform apply -auto-approve      # crea S3, controller, worker, state machine, IAM, dashboard
+
+# Dispara el lote completo (20.000 pagos) y espera a que termine
+cd ..
+./scripts/run_sfn.sh                     # 20.000 pagos, sin duplicados
+./scripts/run_sfn.sh 2000                # prueba rápida de 2.000
+./scripts/run_sfn.sh 20000 50            # 20.000 con 1 de cada 50 duplicado (evidencia ASR-2)
+
+# Verifica resultados (estado de la ejecución, 0 duplicados, manifiesto en S3)
+./scripts/verify_sfn.sh <run_id>
+```
+
+**Evidencia en AWS para la entrega (todo registrado):**
+- **Step Functions** → consola de la máquina de estados: historia de ejecuciones, el mapa visual
+  del Map distribuido y el conteo de ítems OK/fallidos (URL en `terraform output state_machine_console_url`).
+- **S3** → `s3://<data_bucket>/resultados/<run_id>/`: `manifest.json` + archivos `SUCCEEDED/FAILED`
+  con el resultado por pago (salida del `ResultWriter`).
+- **DynamoDB** → `breb-poc-idempotency`: un item por `payment_id` con `status=DONE` (prueba de 0 duplicados).
+- **CloudWatch** → dashboard `breb-poc-sfn-dashboard` (throughput, p95, ejecuciones, errores) + logs
+  de la máquina de estados + alarma `breb-poc-sfn-failed`.
+- **X-Ray** → trazas end-to-end de cada ejecución.
+
+> **Ajuste de ritmo (ASR: máx 10 TPS).** El tope lo fija `sfn_max_concurrency` (default `2`, que con
+> la latencia del stub da ~10 TPS y encaja en el límite de concurrencia 10 de la cuenta sandbox). Si
+> se amplía el límite del core y se quiere acortar la ventana, subir esa variable en `terraform.tfvars`.
+
+---
+
+## Ejecución — baseline SQS (Queue-Based Load Leveling)
 Se evaluó k6 pero se descartó por una incompatibilidad de su jslib de AWS con el runtime de
 CloudShell; los scripts k6 (`load/normal.js`, `load/stress.js`, `load/fault.js`) quedan como
 alternativa.
