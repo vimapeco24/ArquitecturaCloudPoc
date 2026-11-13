@@ -179,7 +179,15 @@ cd ..
 
 # Verifica resultados (estado de la ejecución, 0 duplicados, manifiesto en S3)
 ./scripts/verify_sfn.sh <run_id>
+
+# Genera el reporte de evidencias medidas (rellena la plantilla con datos reales)
+./scripts/capturar_evidencias.sh <run_id>     # crea docs/evidencias_<run_id>.md
 ```
+
+> **Plantilla de evidencias para la entrega:** `docs/PLANTILLA_EVIDENCIAS.md` tiene las tablas
+> y la lista de capturas (Step Functions, CloudWatch, DynamoDB, S3, X-Ray) listas para rellenar
+> con la corrida en vivo. `scripts/capturar_evidencias.sh <run_id>` las auto-completa leyendo las
+> métricas reales de AWS y produce un Markdown para pegar en la sección 17 del documento.
 
 **Evidencia en AWS para la entrega (todo registrado):**
 - **Step Functions** → consola de la máquina de estados: historia de ejecuciones, el mapa visual
