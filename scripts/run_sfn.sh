@@ -2,7 +2,8 @@
 # ---------------------------------------------------------------------------
 # Dispara la máquina de estados (arquitectura Step Functions + Map distribuido)
 # y espera a que termine. Genera el dataset del día y procesa los pagos en
-# paralelo contra el core, dosificado por MaxConcurrency (ASR: máx 10 TPS).
+# paralelo contra el core, dosificado por MaxConcurrency + token bucket
+# (ASR: banda 10–15 TPS para proteger al core).
 #
 # Uso:
 #   ./scripts/run_sfn.sh [TOTAL] [DUPLICATE_EVERY]

@@ -95,14 +95,29 @@ variable "sfn_max_concurrency" {
   description = <<-EOT
     MaxConcurrency del Map DISTRIBUIDO: nº máximo de workers que corren EN PARALELO.
     Es el control que dosifica el ritmo contra el core (reemplaza el Load Leveling
-    de la cola). El ASR exige MÁX 10 TPS procesando 20.000 en una ventana de 1 h.
-    Con latencia del core ~0.175 s, TPS ≈ concurrencia / latencia; para no pasar de
-    10 TPS la concurrencia efectiva es ~2. Default 2 (cumple ASR y encaja en el
-    límite de concurrencia 10 de la cuenta sandbox). Subir solo si se amplía el
-    límite del core y se quiere acortar la ventana.
+    de la cola). El ASR exige procesar 20.000 pagos en una ventana de 1 h dentro de
+    la banda objetivo de 10–15 TPS (tope que protege al core).
+
+    Dimensionamiento (latencia media del core ~0.175 s; TPS ≈ concurrencia / latencia):
+      - concurrencia 2 → ~11,4 TPS  → 20.000 pagos ≈ 29 min  (dentro de 10–15 TPS)
+      - concurrencia 3 → ~17,1 TPS  (borde superior; usar solo si el core lo admite)
+    Default 3 con tope de ritmo por token bucket (ver sfn_target_tps): el worker
+    autolimita el ritmo para mantener la banda 10–15 TPS incluso con 3 en paralelo,
+    y encaja en el límite de concurrencia 10 de la cuenta sandbox.
   EOT
   type        = number
-  default     = 2
+  default     = 3
+}
+
+variable "sfn_target_tps" {
+  description = <<-EOT
+    Ritmo objetivo (TPS) hacia el core. El worker autolimita su ritmo a este valor
+    mediante un token bucket distribuido en DynamoDB, manteniendo el throughput
+    sostenido dentro de la banda 10–15 TPS del ASR independientemente de la
+    concurrencia del Map. Default 15 (borde superior de la banda; 20.000 pagos ≈ 22 min).
+  EOT
+  type        = number
+  default     = 15
 }
 
 variable "sfn_item_batch_count" {

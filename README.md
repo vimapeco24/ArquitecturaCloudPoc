@@ -5,8 +5,9 @@ Prueba de concepto que valida los requisitos de arquitectura significativos (ASR
 
 - **ASR-1 — Desempeño en la ventana de ejecución:** la arquitectura serverless orientada a
   eventos debe procesar el lote diario de **20.000 pagos** dentro de la ventana de **60 min**,
-  a un ritmo de **máximo 10 TPS** (tope que protege al core) con **p95 ≤ 2 s**. A 10 TPS,
-  20.000 pagos se procesan en ≈ 33 min, holgadamente dentro de la ventana.
+  a un ritmo sostenido dentro de la **banda de 10–15 TPS** (tope que protege al core) con
+  **p95 ≤ 2 s**. A 15 TPS, 20.000 pagos se procesan en ≈ 22–24 min; a 10 TPS en ≈ 33 min,
+  holgadamente dentro de la ventana.
 - **ASR-2 — Integridad (0 pérdidas / 0 duplicados):** ningún mensaje se pierde y ningún pago se
   ejecuta dos veces, incluso ante fallos transitorios del backend.
 
@@ -18,9 +19,11 @@ Este repositorio implementa **dos** materializaciones del mismo flujo, para comp
    Una máquina de estados orquesta todo: un **Controller** consulta/genera los 20.000 pagos del
    día y los deja en S3; un estado **Map distribuido** los itera **en paralelo** invocando un
    **Worker** por pago (idempotencia + llamada al core + verificación + actualización de estado).
-   **No hay cola ni Lambda disparadora**: el dosificado (Load Leveling) lo da el `MaxConcurrency`
-   del Map. Es lo que pide el ASR y lo que se lleva a la entrega. Archivos: `terraform/stepfunctions.tf`,
-   `lambda/controller/`, `lambda/worker/`, `scripts/run_sfn.sh`, `scripts/verify_sfn.sh`,
+   **No hay cola ni Lambda disparadora**: el dosificado (Load Leveling) lo dan el `MaxConcurrency`
+   del Map **y un token bucket distribuido** (DynamoDB) que fija el ritmo sostenido en la banda
+   **10–15 TPS**. Es lo que pide el ASR y lo que se lleva a la entrega. Archivos:
+   `terraform/stepfunctions.tf`, `lambda/controller/`, `lambda/worker/`, `scripts/run_sfn.sh`,
+   `scripts/verify_sfn.sh`, `sim/` (simulador determinista del dosificado),
    diagrama `BreB_PoC_SFN.(drawio|png)`.
 
 2. **SQS + Lambda consumer (baseline, Queue-Based Load Leveling).**
@@ -31,9 +34,17 @@ Este repositorio implementa **dos** materializaciones del mismo flujo, para comp
 Ambas **comparten** el stub del core (`lambda/stub_backend/`) y la tabla de idempotencia DynamoDB.
 
 > **ASR-1 (dimensionamiento):** el objetivo es procesar **20.000 pagos** en una ventana de **1 hora**
-> a un ritmo de **máximo 10 TPS** (para proteger el core). 20.000 / 10 TPS ≈ **33 min**, dentro de la
-> ventana. En la arquitectura de Step Functions ese tope de 10 TPS se logra fijando `MaxConcurrency`
-> del Map (con latencia del core ~0.175 s, TPS ≈ concurrencia / latencia → concurrencia ≈ 2).
+> a un ritmo sostenido dentro de la **banda 10–15 TPS** (para proteger el core). A 15 TPS,
+> 20.000 / 15 ≈ **22 min**; a 10 TPS ≈ **33 min**, dentro de la ventana. En la arquitectura de
+> Step Functions el ritmo lo fijan el `MaxConcurrency` del Map (default 3) **más un token bucket
+> distribuido** en DynamoDB (`sfn_target_tps`, default 15), de modo que el throughput agregado
+> hacia el core se mantiene en la banda aunque corran varios workers en paralelo.
+
+> **Validación reproducible (sin AWS):** `./scripts/validate_dosing.sh` corre un simulador
+> determinista del dosificado (`sim/simulate_dosing.py`) que, con los parámetros reales del core
+> (latencia 50–300 ms, 5 % de errores), reproduce las cifras que se citan en el documento:
+> **20.000 pagos a 13,9 TPS sostenidos en ≈ 23,5 min (100 % dentro de la ventana de 1 h) y 0
+> duplicados**. Para la corrida EN VIVO sobre AWS se usa `./scripts/run_sfn.sh` (requiere credenciales).
 
 > **Estado:** la baseline SQS está DESPLEGADA y VERIFICADA end-to-end (2026-10-28, cuenta `aftc_test`
 > `803647807230`, **us-east-2**). La arquitectura de Step Functions está **lista para desplegar**
@@ -70,22 +81,22 @@ Observabilidad: CloudWatch (throughput, p95, backlog, error rate) + X-Ray (traza
 
 ## Criterios de éxito
 
-| Métrica                | Objetivo | Fuente                                    |
-|------------------------|----------|-------------------------------------------|
-| Throughput sostenido   | ≥ 10 TPS | CloudWatch (invocaciones Lambda / s)      |
-| Latencia p95 / mensaje | ≤ 2 s    | X-Ray / CloudWatch                        |
-| % completado en ventana| ≥ 99 %   | CloudWatch (cola vaciada antes de 60 min) |
-| Mensajes perdidos      | 0        | SQS enviados vs procesados + DLQ          |
-| Pagos duplicados       | 0        | Verificación de idempotencia en DynamoDB  |
-| Error rate             | < 1 %    | CloudWatch Logs Insights                  |
+| Métrica                | Objetivo   | Fuente                                    |
+|------------------------|------------|-------------------------------------------|
+| Throughput sostenido   | 10–15 TPS  | CloudWatch (invocaciones Worker / s)      |
+| Latencia p95 / mensaje | ≤ 2 s      | X-Ray / CloudWatch                        |
+| % completado en ventana| ≥ 99 %     | CloudWatch (lote terminado antes de 60 min)|
+| Mensajes perdidos      | 0          | Items enviados vs resultados del Map + DLQ|
+| Pagos duplicados       | 0          | Verificación de idempotencia en DynamoDB  |
+| Error rate             | < 1 %      | CloudWatch Logs Insights                  |
 
 ## Escenarios de prueba
 
 | Escenario       | Carga                    | Criterio de éxito                                         |
 |-----------------|--------------------------|-----------------------------------------------------------|
-| Normal          | 2.000 mensajes/ventana   | ≥ 99 % procesados; p95 ≤ 2 s; error rate < 1 %            |
-| Estrés (pico)   | 6.000 mensajes (3×)      | Degradación controlada; 0 perdidos; backlog drenado       |
-| Fallo transitorio | 5 % de errores en stub | Reintentos con backoff; no procesables a DLQ; 0 duplicados |
+| Normal          | 20.000 pagos/ventana     | ≥ 99 % procesados en ≤ 60 min; 10–15 TPS; p95 ≤ 2 s; error < 1 % |
+| Conservador     | 20.000 pagos @ 10 TPS    | Mismos criterios en el borde inferior de la banda          |
+| Fallo + duplicados | 5 % errores + 1/50 dup | Reintentos con backoff; no procesables a DLQ; 0 duplicados |
 
 ---
 
@@ -95,15 +106,20 @@ Observabilidad: CloudWatch (throughput, p95, backlog, error rate) + X-Ray (traza
 poc-breb-aws/
 ├── terraform/          IaC. Arquitectura Step Functions: stepfunctions.tf (S3, controller,
 │                       worker, state machine con Map distribuido). Baseline SQS: sqs.tf,
-│                       lambda.tf. Compartido: dynamodb.tf, iam.tf, observability.tf (2
-│                       dashboards + alarmas), scheduler.tf (dispara la state machine), outputs.tf
+│                       lambda.tf. Compartido: dynamodb.tf (idempotencia + token bucket de
+│                       ritmo), iam.tf, observability.tf (2 dashboards + alarmas),
+│                       scheduler.tf (dispara la state machine), outputs.tf
 ├── lambda/
 │   ├── controller/     Genera/consulta los 20.000 pagos del día → dataset JSONL en S3
-│   ├── worker/         Procesa un pago en el Map distribuido: idempotencia + core + estado
+│   ├── worker/         Procesa un pago en el Map: idempotencia + token bucket (10–15 TPS) +
+│   │                   core + estado. Incluye test_handler.py (pruebas unitarias)
 │   ├── consumer/       (baseline) Consumidor SQS: idempotencia + llamada al stub + backoff
 │   └── stub_backend/   Core bancario simulado (latencia + 5% de errores) — compartido
+├── sim/                Simulador DETERMINISTA del dosificado (simulate_dosing.py) + pruebas
+│                       (test_dosing.py). Reproduce las cifras del documento sin desplegar AWS
 ├── load/               (baseline) Scripts de carga para la cola SQS
-├── scripts/            run_sfn.sh / verify_sfn.sh (Step Functions) · deploy/verify/metrics (baseline)
+├── scripts/            run_sfn.sh / verify_sfn.sh / validate_dosing.sh (Step Functions) ·
+│                       deploy/verify/metrics (baseline)
 ├── BreB_PoC_SFN.*      Diagrama de la arquitectura Step Functions + Map distribuido
 ├── BreB_PoC_AWS.*      Diagrama de la baseline SQS
 └── README.md
@@ -148,6 +164,9 @@ terraform apply -auto-approve
 Despliega y dispara el lote de las 20.000 transacciones; todo queda registrado en AWS.
 
 ```bash
+# (Opcional, sin AWS) Valida el dosificado 10–15 TPS / 20.000 pagos de forma reproducible
+./scripts/validate_dosing.sh
+
 cd poc-breb-aws/terraform
 terraform init
 terraform apply -auto-approve      # crea S3, controller, worker, state machine, IAM, dashboard
@@ -172,9 +191,14 @@ cd ..
   de la máquina de estados + alarma `breb-poc-sfn-failed`.
 - **X-Ray** → trazas end-to-end de cada ejecución.
 
-> **Ajuste de ritmo (ASR: máx 10 TPS).** El tope lo fija `sfn_max_concurrency` (default `2`, que con
-> la latencia del stub da ~10 TPS y encaja en el límite de concurrencia 10 de la cuenta sandbox). Si
-> se amplía el límite del core y se quiere acortar la ventana, subir esa variable en `terraform.tfvars`.
+> **Ajuste de ritmo (ASR: banda 10–15 TPS).** El ritmo sostenido lo fija el token bucket
+> distribuido (`sfn_target_tps`, default `15`) y el nº de workers en paralelo lo acota
+> `sfn_max_concurrency` (default `3`, que encaja en el límite de concurrencia 10 de la cuenta
+> sandbox). Con `sfn_target_tps=15` el throughput se mantiene ~14 TPS (borde superior de la banda);
+> bajar a `10` lo lleva al borde inferior (≈33 min). Si se amplía el límite del core, subir ambos.
+
+> **Validación sin desplegar:** `./scripts/validate_dosing.sh` corre el simulador determinista y
+> las pruebas unitarias; reproduce las mismas cifras que se citan en el documento.
 
 ---
 

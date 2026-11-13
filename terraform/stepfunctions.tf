@@ -9,8 +9,9 @@
 #     3. ResultWriter: escribe el resultado agregado a S3 (evidencia en AWS)
 #
 # Reemplaza la pareja "cola SQS + consumer": el Load Leveling lo da ahora la
-# CONCURRENCIA del Map (MaxConcurrency), alineada al ASR (máx 10 TPS / 20.000
-# en una ventana de 1 h). Reutiliza el stub backend y la tabla de idempotencia.
+# CONCURRENCIA del Map (MaxConcurrency) + un token bucket distribuido que fija el
+# ritmo SOSTENIDO en la banda 10–15 TPS del ASR (20.000 pagos en una ventana de
+# 1 h). Reutiliza el stub backend y la tabla de idempotencia.
 # ===========================================================================
 
 # ---- Bucket S3: dataset de entrada + resultados del Map (evidencia) -------
@@ -96,6 +97,8 @@ resource "aws_lambda_function" "worker" {
   environment {
     variables = {
       IDEMPOTENCY_TABLE = aws_dynamodb_table.idempotency.name
+      RATE_LIMIT_TABLE  = aws_dynamodb_table.rate_limiter.name
+      TARGET_TPS        = tostring(var.sfn_target_tps)
       BACKEND_FUNCTION  = aws_lambda_function.stub.function_name
       MAX_RETRIES       = tostring(var.max_retries)
     }

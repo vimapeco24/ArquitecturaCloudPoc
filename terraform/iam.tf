@@ -136,7 +136,10 @@ data "aws_iam_policy_document" "worker" {
       "dynamodb:DeleteItem",
       "dynamodb:GetItem",
     ]
-    resources = [aws_dynamodb_table.idempotency.arn]
+    resources = [
+      aws_dynamodb_table.idempotency.arn,
+      aws_dynamodb_table.rate_limiter.arn,
+    ]
   }
 
   statement {

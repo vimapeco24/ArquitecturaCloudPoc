@@ -40,8 +40,19 @@ BASE_BACKOFF_SECONDS = float(os.environ.get("BASE_BACKOFF_SECONDS", "0.2"))
 BACKEND_TIMEOUT_SECONDS = float(os.environ.get("BACKEND_TIMEOUT_SECONDS", "5"))
 IDEMPOTENCY_TTL_SECONDS = int(os.environ.get("IDEMPOTENCY_TTL_SECONDS", str(7 * 24 * 3600)))
 
+# --- Control de ritmo (ASR-1: banda 10–15 TPS) -----------------------------
+# Token bucket distribuido en DynamoDB compartido por todos los workers del Map.
+# Fija el throughput SOSTENIDO hacia el core en TARGET_TPS, independientemente de
+# cuántos workers corran en paralelo (MaxConcurrency). Así el pico de las 6:00 a.m.
+# nunca golpea al backend por encima de la banda objetivo.
+RATE_LIMIT_TABLE = os.environ.get("RATE_LIMIT_TABLE", "")
+TARGET_TPS = float(os.environ.get("TARGET_TPS", "15"))
+RATE_BUCKET_ID = os.environ.get("RATE_BUCKET_ID", "core")
+RATE_MAX_WAIT_SECONDS = float(os.environ.get("RATE_MAX_WAIT_SECONDS", "20"))
+
 _ddb = boto3.resource("dynamodb", config=Config(retries={"max_attempts": 3, "mode": "standard"}))
 _table = _ddb.Table(IDEMPOTENCY_TABLE)
+_rate_table = _ddb.Table(RATE_LIMIT_TABLE) if RATE_LIMIT_TABLE else None
 
 _lambda = boto3.client(
     "lambda",
@@ -55,6 +66,88 @@ _lambda = boto3.client(
 
 class PermanentError(Exception):
     """Error no recuperable: el pago queda FAILED; la máquina de estados lo contabiliza."""
+
+
+def _acquire_rate_token(now: float = None) -> None:
+    """
+    Token bucket distribuido (ASR-1). Bloquea hasta que haya 1 token disponible,
+    recargando a TARGET_TPS tokens/segundo. Varios workers comparten el mismo
+    bucket en DynamoDB, de modo que el throughput agregado hacia el core no
+    excede TARGET_TPS (banda 10–15 TPS). Si TARGET_TPS<=0 o no hay tabla, no
+    limita (modo sin dosificado).
+    """
+    if _rate_table is None or TARGET_TPS <= 0:
+        return
+
+    capacity = 2.0  # ráfaga máxima acotada: throughput liso dentro de la banda
+    deadline = (now if now is not None else time.time()) + RATE_MAX_WAIT_SECONDS
+
+    while True:
+        t = time.time()
+        try:
+            # Lee el estado actual del bucket.
+            item = _rate_table.get_item(Key={"bucket_id": RATE_BUCKET_ID}).get("Item")
+            if item is None:
+                # Inicializa el bucket lleno (condicional: solo si no existe).
+                try:
+                    _rate_table.put_item(
+                        Item={
+                            "bucket_id": RATE_BUCKET_ID,
+                            "tokens": _d(capacity - 1),
+                            "updated_at": _d(t),
+                            "expires_at": int(t) + 24 * 3600,
+                        },
+                        ConditionExpression="attribute_not_exists(bucket_id)",
+                    )
+                    return
+                except ClientError as exc:
+                    if exc.response["Error"]["Code"] == "ConditionalCheckFailedException":
+                        continue  # otro worker lo creó; reintenta el update
+                    raise
+
+            prev_tokens = float(item["tokens"])
+            prev_ts = float(item["updated_at"])
+            # Recarga proporcional al tiempo transcurrido.
+            refilled = min(capacity, prev_tokens + (t - prev_ts) * TARGET_TPS)
+
+            if refilled >= 1.0:
+                new_tokens = refilled - 1.0
+                try:
+                    # Consume 1 token de forma atómica (solo si nadie tocó el item).
+                    _rate_table.update_item(
+                        Key={"bucket_id": RATE_BUCKET_ID},
+                        UpdateExpression="SET tokens = :nt, updated_at = :now, expires_at = :exp",
+                        ConditionExpression="tokens = :pt AND updated_at = :pts",
+                        ExpressionAttributeValues={
+                            ":nt": _d(new_tokens),
+                            ":now": _d(t),
+                            ":exp": int(t) + 24 * 3600,
+                            ":pt": _d(prev_tokens),
+                            ":pts": _d(prev_ts),
+                        },
+                    )
+                    return
+                except ClientError as exc:
+                    if exc.response["Error"]["Code"] == "ConditionalCheckFailedException":
+                        continue  # contención: otro worker ganó; reintenta
+                    raise
+            else:
+                # No hay tokens: espera el tiempo justo para que se genere 1.
+                wait = (1.0 - refilled) / TARGET_TPS
+                if t >= deadline:
+                    # Salvaguarda: no bloquear indefinidamente (el Retry del SFN cubre el resto).
+                    return
+                time.sleep(min(wait, 1.0))
+        except ClientError:
+            # Ante error transitorio de DynamoDB, no bloquear el pago: continúa.
+            return
+
+
+def _d(value: float):
+    """Decimal con precisión acotada para DynamoDB (evita F:floating point)."""
+    from decimal import Decimal
+    return Decimal(str(round(value, 6)))
+
 
 
 def _reserve_idempotency_key(key: str) -> bool:
@@ -146,6 +239,9 @@ def _process_one(payment: dict) -> dict:
         return {"payment_id": payment_id, "status": "DUPLICATE_SKIPPED"}
 
     try:
+        # Dosificado de ritmo (ASR-1): espera un token antes de golpear al core,
+        # manteniendo el throughput agregado dentro de la banda 10–15 TPS.
+        _acquire_rate_token()
         backend = _call_backend(payment)
         _mark(payment_id, "DONE")
         print(json.dumps({"event": "processed", "payment_id": payment_id}))

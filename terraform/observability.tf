@@ -113,7 +113,7 @@ resource "aws_cloudwatch_dashboard" "sfn" {
         type = "metric"
         x    = 0, y = 0, width = 12, height = 6
         properties = {
-          title  = "Throughput — invocaciones del worker (ASR: máx 10 TPS)"
+          title  = "Throughput — invocaciones del worker (ASR: banda 10–15 TPS)"
           region = var.aws_region
           stat   = "Sum"
           period = 60
