@@ -29,21 +29,34 @@ aws stepfunctions list-executions --region "$REGION" \
 
 echo
 echo "== Ventana del ASR: 20.000 pagos en <= 60 min a 10-15 TPS =="
-EXEC_ARN=$(aws stepfunctions list-executions --region "$REGION" --state-machine-arn "$SM_ARN" \
-  --max-results 1 --query 'executions[0].executionArn' --output text)
-read -r ST START STOP < <(aws stepfunctions describe-execution --region "$REGION" --execution-arn "$EXEC_ARN" \
-  --query '[status,startDate,stopDate]' --output text)
-echo "estado: $ST"
+if [[ -n "$RUN_ID" ]]; then
+  EXEC_ARN="${SM_ARN/:stateMachine:/:execution:}:$RUN_ID"
+else
+  EXEC_ARN=$(aws stepfunctions list-executions --region "$REGION" --state-machine-arn "$SM_ARN" \
+    --max-results 1 --query 'executions[0].executionArn' --output text)
+fi
+DESC=$(aws stepfunctions describe-execution --region "$REGION" --execution-arn "$EXEC_ARN" --output json)
+ST=$(python3 -c 'import json,sys;print(json.load(sys.stdin)["status"])' <<<"$DESC")
+echo "ejecucion: ${EXEC_ARN##*:}  |  estado: $ST"
 if [[ "$ST" == "SUCCEEDED" ]]; then
-  python3 - "$START" "$STOP" <<'PY'
-import sys
-total = 20000
-start, stop = float(sys.argv[1]), float(sys.argv[2])
-dur = stop - start
+  python3 - "$DESC" <<'PY'
+import json, sys
+from datetime import datetime
+d = json.loads(sys.argv[1])
+def ts(v):
+    # El CLI puede devolver epoch (numero) o ISO-8601 segun cli_timestamp_format.
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return datetime.fromisoformat(str(v).replace("Z", "+00:00")).timestamp()
+total = int(json.loads(d.get("input") or "{}").get("total", 20000))
+dur = ts(d["stopDate"]) - ts(d["startDate"])
 tps = total / dur
-print(f"duracion: {dur/60:.1f} min  |  TPS promedio: {tps:.1f}")
+print(f"pagos: {total}  |  duracion: {dur:.0f} s = {dur/60:.1f} min  |  TPS promedio: {tps:.1f}")
 print("ASR ventana (<= 60 min):", "OK" if dur <= 3600 else "INCUMPLIDO")
-print("ASR banda 10-15 TPS   :", "OK" if 10 <= tps <= 15 else "REVISAR (TOTAL distinto de 20000 o ritmo fuera de banda)")
+print("ASR banda 10-15 TPS   :", "OK" if 10 <= tps <= 15 else "FUERA DE BANDA")
+if total != 20000:
+    print("(corrida de prueba: el ASR completo se valida con 20000 pagos)")
 PY
 elif [[ "$ST" == "TIMED_OUT" ]]; then
   echo "ASR ventana: INCUMPLIDO (la ejecucion supero los 60 min y fue cortada)"
