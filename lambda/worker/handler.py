@@ -38,6 +38,9 @@ BACKEND_FUNCTION = os.environ["BACKEND_FUNCTION"]
 MAX_RETRIES = int(os.environ.get("MAX_RETRIES", "3"))
 BASE_BACKOFF_SECONDS = float(os.environ.get("BASE_BACKOFF_SECONDS", "0.2"))
 BACKEND_TIMEOUT_SECONDS = float(os.environ.get("BACKEND_TIMEOUT_SECONDS", "5"))
+# Idempotencia DESACTIVADA por defecto en esta corrida de la PoC (ASR de volumen/ventana:
+# 20.000 pagos en <= 1 h a 10-15 TPS). Con "true" se reactiva el PutItem condicional (ASR-2).
+ENABLE_IDEMPOTENCY = os.environ.get("ENABLE_IDEMPOTENCY", "false").strip().lower() == "true"
 IDEMPOTENCY_TTL_SECONDS = int(os.environ.get("IDEMPOTENCY_TTL_SECONDS", str(7 * 24 * 3600)))
 
 # --- Control de ritmo (ASR-1: banda 10–15 TPS) -----------------------------
@@ -64,6 +67,32 @@ _lambda = boto3.client(
 )
 
 
+def _emit_core_call(latency_ms: float, failed: bool) -> None:
+    """
+    Metrica embebida (EMF) por CADA llamada al core, con resolucion de 1 s.
+    Alimenta el grafico tipo k6 del dashboard: CoreCalls/PERIOD = TPS real hacia el
+    core (incluye reintentos), ResponseTimeMs = tiempo de respuesta, CoreFailures.
+    """
+    print(json.dumps({
+        "_aws": {
+            "Timestamp": int(time.time() * 1000),
+            "CloudWatchMetrics": [{
+                "Namespace": "BrebPoC",
+                "Dimensions": [["Service"]],
+                "Metrics": [
+                    {"Name": "CoreCalls", "Unit": "Count", "StorageResolution": 1},
+                    {"Name": "CoreFailures", "Unit": "Count", "StorageResolution": 1},
+                    {"Name": "ResponseTimeMs", "Unit": "Milliseconds", "StorageResolution": 1},
+                ],
+            }],
+        },
+        "Service": "core",
+        "CoreCalls": 1,
+        "CoreFailures": 1 if failed else 0,
+        "ResponseTimeMs": round(latency_ms, 1),
+    }))
+
+
 class PermanentError(Exception):
     """Error no recuperable: el pago queda FAILED; la máquina de estados lo contabiliza."""
 
@@ -79,7 +108,7 @@ def _acquire_rate_token(now: float = None) -> None:
     if _rate_table is None or TARGET_TPS <= 0:
         return
 
-    capacity = 2.0  # ráfaga máxima acotada: throughput liso dentro de la banda
+    capacity = 1.0  # sin ráfaga: 1 pago cada 1/TARGET_TPS s, nunca por encima del tope
     deadline = (now if now is not None else time.time()) + RATE_MAX_WAIT_SECONDS
 
     while True:
@@ -202,16 +231,22 @@ def _call_backend(payload: dict) -> dict:
     last_err = None
     for attempt in range(1, MAX_RETRIES + 1):
         try:
+            # Un token POR INTENTO: los reintentos tambien cuentan contra el tope de TPS
+            # del core, asi la banda 10-15 TPS no se excede ni siquiera con fallos.
+            _acquire_rate_token()
+            t0 = time.time()
             resp = _lambda.invoke(
                 FunctionName=BACKEND_FUNCTION,
                 InvocationType="RequestResponse",
                 Payload=raw_event,
             )
             if resp.get("FunctionError"):
+                _emit_core_call((time.time() - t0) * 1000, True)
                 last_err = resp["FunctionError"]
             else:
                 result = json.loads(resp["Payload"].read())
                 status = int(result.get("statusCode", 500))
+                _emit_core_call((time.time() - t0) * 1000, not (200 <= status < 300))
                 if 200 <= status < 300:
                     return json.loads(result.get("body", "{}"))
                 last_err = f"HTTP {status}"
@@ -233,17 +268,16 @@ def _call_backend(payload: dict) -> dict:
 def _process_one(payment: dict) -> dict:
     payment_id = payment["payment_id"]
 
-    if not _reserve_idempotency_key(payment_id):
+    if ENABLE_IDEMPOTENCY and not _reserve_idempotency_key(payment_id):
         # Duplicado: no se ejecuta el pago dos veces (ASR-2).
         print(json.dumps({"event": "duplicate_skipped", "payment_id": payment_id}))
         return {"payment_id": payment_id, "status": "DUPLICATE_SKIPPED"}
 
     try:
-        # Dosificado de ritmo (ASR-1): espera un token antes de golpear al core,
-        # manteniendo el throughput agregado dentro de la banda 10–15 TPS.
-        _acquire_rate_token()
+        # El token bucket se consume dentro de _call_backend (uno por intento).
         backend = _call_backend(payment)
-        _mark(payment_id, "DONE")
+        if ENABLE_IDEMPOTENCY:
+            _mark(payment_id, "DONE")
         print(json.dumps({"event": "processed", "payment_id": payment_id}))
         return {
             "payment_id": payment_id,
@@ -251,12 +285,15 @@ def _process_one(payment: dict) -> dict:
             "backend_status": backend.get("status"),
             "latency_ms": backend.get("latency_ms"),
         }
-    except Exception:
-        # Falla definitiva: marca FAILED y propaga para que la máquina de estados
-        # cuente el fallo y dispare la notificación al usuario.
-        _mark(payment_id, "FAILED")
+    except Exception as exc:
         print(json.dumps({"event": "process_failed", "payment_id": payment_id}))
-        raise
+        if ENABLE_IDEMPOTENCY:
+            # Con idempotencia, la maquina de estados puede reintentar sin riesgo.
+            _mark(payment_id, "FAILED")
+            raise
+        # SIN idempotencia no se debe re-ejecutar un lote: un Retry del Map repetiria
+        # pagos ya hechos. El fallo se devuelve como dato y queda en el ResultWriter.
+        return {"payment_id": payment_id, "status": "FAILED", "error": str(exc)[:200]}
 
 
 def handler(event, context):

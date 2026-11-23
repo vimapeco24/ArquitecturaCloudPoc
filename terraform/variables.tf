@@ -106,7 +106,19 @@ variable "sfn_max_concurrency" {
     y encaja en el límite de concurrencia 10 de la cuenta sandbox.
   EOT
   type        = number
-  default     = 3
+  default     = 4
+}
+
+variable "enable_idempotency" {
+  description = "Idempotencia (PutItem condicional en DynamoDB) en el worker. false = corrida de volumen/ventana del ASR: 20.000 pagos en <= 1 h sin idempotencia."
+  type        = bool
+  default     = false
+}
+
+variable "sfn_window_seconds" {
+  description = "Ventana maxima de la ejecucion (TimeoutSeconds de la maquina de estados). 3600 = 60 min: si se supera, la ejecucion termina TIMED_OUT y el ASR se marca incumplido."
+  type        = number
+  default     = 3600
 }
 
 variable "sfn_target_tps" {
@@ -114,22 +126,22 @@ variable "sfn_target_tps" {
     Ritmo objetivo (TPS) hacia el core. El worker autolimita su ritmo a este valor
     mediante un token bucket distribuido en DynamoDB, manteniendo el throughput
     sostenido dentro de la banda 10–15 TPS del ASR independientemente de la
-    concurrencia del Map. Default 15 (borde superior de la banda; 20.000 pagos ≈ 22 min).
+    concurrencia del Map. Default 12 (centro de la banda 10-15; 20.000 pagos ≈ 28 min, holgura >30 min dentro de la ventana de 60 min).
   EOT
   type        = number
-  default     = 15
+  default     = 12
 }
 
 variable "sfn_item_batch_count" {
-  description = "Pagos por invocación del worker (ItemBatcher del Map). 1 = un pago por worker."
+  description = "Pagos por invocación del worker (ItemBatcher del Map). 50 amortiza el arranque de cada ejecución hija para sostener 10-15 TPS con pocos workers."
   type        = number
-  default     = 1
+  default     = 50
 }
 
 variable "worker_timeout_seconds" {
   description = "Timeout de la Lambda worker."
   type        = number
-  default     = 30
+  default     = 180
 }
 
 variable "worker_memory_mb" {

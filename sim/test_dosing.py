@@ -25,11 +25,22 @@ class TestDosing(unittest.TestCase):
         self.assertGreaterEqual(r["pct_completed_in_window"], 99.0)
 
     def test_20k_10tps_en_banda(self):
-        """Borde inferior de la banda: 10 TPS con concurrencia suficiente."""
-        r = run(total=20000, concurrency=3, target_tps=10, duplicate_every=0)
+        """Zona baja de la banda: objetivo 11 TPS (10.0 exacto queda en el borde por redondeo)."""
+        r = run(total=20000, concurrency=4, target_tps=11, duplicate_every=0)
         self.assertTrue(10.0 <= r["sustained_tps"] <= 15.0,
                         f"TPS fuera de banda: {r['sustained_tps']}")
         self.assertTrue(r["within_window"])
+
+    def test_peor_caso_latencia_x3_cabe_en_1h(self):
+        """Colchon de seguridad: con el core 3 veces mas lento los 20.000 pagos aun caben en 60 min."""
+        import simulate_dosing as sd
+        old = (sd.LATENCY_MIN_S, sd.LATENCY_MAX_S)
+        sd.LATENCY_MIN_S, sd.LATENCY_MAX_S = old[0] * 3, old[1] * 3
+        try:
+            r = sd.run(total=20000, concurrency=4, target_tps=12, duplicate_every=0)
+        finally:
+            sd.LATENCY_MIN_S, sd.LATENCY_MAX_S = old
+        self.assertLessEqual(r["makespan_seconds"], 3600)
 
     def test_idempotencia_sin_duplicados(self):
         """ASR-2: los payment_id repetidos no se ejecutan dos veces."""

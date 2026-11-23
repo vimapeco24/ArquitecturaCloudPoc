@@ -109,34 +109,87 @@ resource "aws_cloudwatch_dashboard" "sfn" {
 
   dashboard_body = jsonencode({
     widgets = [
+      # --- KPIs tipo k6 (sobre el rango de tiempo visible) ---------------
       {
         type = "metric"
-        x    = 0, y = 0, width = 12, height = 6
+        x    = 0, y = 0, width = 6, height = 3
         properties = {
-          title  = "Throughput — invocaciones del worker (ASR: banda 10–15 TPS)"
+          title                = "Requests al core"
+          region               = var.aws_region
+          view                 = "singleValue"
+          stat                 = "Sum"
+          setPeriodToTimeRange = true
+          metrics              = [["BrebPoC", "CoreCalls", "Service", "core"]]
+        }
+      },
+      {
+        type = "metric"
+        x    = 6, y = 0, width = 6, height = 3
+        properties = {
+          title                = "Fallos HTTP/core"
+          region               = var.aws_region
+          view                 = "singleValue"
+          stat                 = "Sum"
+          setPeriodToTimeRange = true
+          metrics              = [["BrebPoC", "CoreFailures", "Service", "core"]]
+        }
+      },
+      {
+        type = "metric"
+        x    = 12, y = 0, width = 6, height = 3
+        properties = {
+          title                = "TPS promedio (rango visible)"
+          region               = var.aws_region
+          view                 = "singleValue"
+          period               = 60
+          setPeriodToTimeRange = true
+          metrics = [[{ expression = "m1/PERIOD(m1)", label = "TPS", id = "e1" }],
+          ["BrebPoC", "CoreCalls", "Service", "core", { id = "m1", stat = "Sum", visible = false }]]
+        }
+      },
+      {
+        type = "metric"
+        x    = 18, y = 0, width = 6, height = 3
+        properties = {
+          title                = "Tiempo de respuesta p95 (ms)"
+          region               = var.aws_region
+          view                 = "singleValue"
+          setPeriodToTimeRange = true
+          metrics              = [["BrebPoC", "ResponseTimeMs", "Service", "core", { stat = "p95" }]]
+        }
+      },
+      # --- Grafico principal tipo k6: TPS (izq.) + tiempo de respuesta (der.) ---
+      {
+        type = "metric"
+        x    = 0, y = 3, width = 24, height = 9
+        properties = {
+          title  = "Performance overview — TPS hacia el core y tiempo de respuesta (banda ASR 10–15 TPS)"
           region = var.aws_region
-          stat   = "Sum"
-          period = 60
+          view   = "timeSeries"
+          period = 10
+          yAxis = {
+            left  = { label = "TPS (req/s)", min = 0, max = 20 }
+            right = { label = "ms", min = 0 }
+          }
+          annotations = {
+            horizontal = [
+              { label = "Máx ASR 15 TPS", value = 15, color = "#d62728" },
+              { label = "Mín ASR 10 TPS", value = 10, color = "#2ca02c" }
+            ]
+          }
           metrics = [
-            ["AWS/Lambda", "Invocations", "FunctionName", aws_lambda_function.worker.function_name]
+            [{ expression = "calls/PERIOD(calls)", label = "Request rate (TPS)", id = "tps", color = "#f2c500" }],
+            ["BrebPoC", "CoreCalls", "Service", "core", { id = "calls", stat = "Sum", visible = false }],
+            [{ expression = "fails/PERIOD(fails)", label = "Failure rate (/s)", id = "fr", color = "#d62728" }],
+            ["BrebPoC", "CoreFailures", "Service", "core", { id = "fails", stat = "Sum", visible = false }],
+            ["BrebPoC", "ResponseTimeMs", "Service", "core", { id = "rt", stat = "p95", label = "Response time p95 (ms)", yAxis = "right", color = "#7aa7ff" }],
+            ["BrebPoC", "ResponseTimeMs", "Service", "core", { id = "rta", stat = "Average", label = "Response time avg (ms)", yAxis = "right", color = "#aec7e8" }]
           ]
         }
       },
       {
         type = "metric"
-        x    = 12, y = 0, width = 12, height = 6
-        properties = {
-          title  = "Latencia p95 del worker (≤ 2 s)"
-          region = var.aws_region
-          period = 60
-          metrics = [
-            ["AWS/Lambda", "Duration", "FunctionName", aws_lambda_function.worker.function_name, { stat = "p95" }]
-          ]
-        }
-      },
-      {
-        type = "metric"
-        x    = 0, y = 6, width = 12, height = 6
+        x    = 0, y = 12, width = 12, height = 6
         properties = {
           title  = "Ejecuciones de la máquina de estados (iniciadas/OK/fallidas)"
           region = var.aws_region
@@ -151,7 +204,7 @@ resource "aws_cloudwatch_dashboard" "sfn" {
       },
       {
         type = "metric"
-        x    = 12, y = 6, width = 12, height = 6
+        x    = 12, y = 12, width = 12, height = 6
         properties = {
           title  = "Errores del worker (error rate < 1 %)"
           region = var.aws_region

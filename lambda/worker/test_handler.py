@@ -101,7 +101,8 @@ class _FakeLambda:
         return {"Payload": _R()}
 
 
-def _load_handler():
+def _load_handler(idempotency="true"):
+    os.environ["ENABLE_IDEMPOTENCY"] = idempotency
     os.environ["IDEMPOTENCY_TABLE"] = "idem"
     os.environ["RATE_LIMIT_TABLE"] = "rate"
     os.environ["BACKEND_FUNCTION"] = "stub"
@@ -127,6 +128,44 @@ class TestWorker(unittest.TestCase):
         self.assertEqual(r1["status"], "DONE")
         self.assertEqual(r2["status"], "DUPLICATE_SKIPPED")
         self.assertEqual(lam.calls, 1, "el duplicado NO debe invocar el core")
+
+    def test_sin_idempotencia_ejecuta_todo(self):
+        h, ddb, lam = _load_handler("false")
+        pago = {"payment_id": "p-9", "amount": 100, "dest_key": "@x"}
+        r1 = h.handler(dict(pago), None)
+        r2 = h.handler(dict(pago), None)
+        self.assertEqual((r1["status"], r2["status"]), ("DONE", "DONE"))
+        self.assertEqual(lam.calls, 2, "sin idempotencia ambos se ejecutan")
+        self.assertNotIn("p-9", ddb.Table("idem").items, "no toca la tabla de idempotencia")
+
+    def test_sin_idempotencia_fallo_no_rompe_el_lote(self):
+        h, ddb, lam = _load_handler("false")
+        orig = lam.invoke
+        def flaky(FunctionName, InvocationType, Payload):
+            if "mal" in Payload.decode():
+                raise RuntimeError("core caido")
+            return orig(FunctionName=FunctionName, InvocationType=InvocationType, Payload=Payload)
+        lam.invoke = flaky
+        h.BASE_BACKOFF_SECONDS = 0
+        res = h.handler({"Items": [{"payment_id": "ok-1"}, {"payment_id": "mal-1"}, {"payment_id": "ok-2"}]}, None)
+        self.assertEqual([x["status"] for x in res], ["DONE", "FAILED", "DONE"])
+
+    def test_token_por_intento(self):
+        h, ddb, lam = _load_handler("false")
+        n = {"t": 0}
+        h._acquire_rate_token = lambda *a, **k: n.__setitem__("t", n["t"] + 1)
+        orig = lam.invoke
+        calls = {"c": 0}
+        def once_bad(FunctionName, InvocationType, Payload):
+            calls["c"] += 1
+            if calls["c"] == 1:
+                raise RuntimeError("transitorio")
+            return orig(FunctionName=FunctionName, InvocationType=InvocationType, Payload=Payload)
+        lam.invoke = once_bad
+        h.BASE_BACKOFF_SECONDS = 0
+        r = h.handler({"payment_id": "r-1"}, None)
+        self.assertEqual(r["status"], "DONE")
+        self.assertEqual(n["t"], 2, "un token por cada intento (reintento incluido)")
 
     def test_token_bucket_dosifica(self):
         h, ddb, lam = _load_handler()

@@ -63,7 +63,7 @@ def run(total, concurrency, target_tps, duplicate_every, seed=42):
     # Token bucket compartido (recarga continua a target_tps).
     # Ráfaga acotada a ~2 tokens para que el throughput se mantenga liso en la
     # banda (sin picos artificiales por acumulación inicial de tokens).
-    burst = 2.0
+    burst = 1.0
     bucket = {"tokens": burst, "ts": 0.0}
     capacity = burst
 

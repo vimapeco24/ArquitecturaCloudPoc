@@ -96,11 +96,12 @@ resource "aws_lambda_function" "worker" {
 
   environment {
     variables = {
-      IDEMPOTENCY_TABLE = aws_dynamodb_table.idempotency.name
-      RATE_LIMIT_TABLE  = aws_dynamodb_table.rate_limiter.name
-      TARGET_TPS        = tostring(var.sfn_target_tps)
-      BACKEND_FUNCTION  = aws_lambda_function.stub.function_name
-      MAX_RETRIES       = tostring(var.max_retries)
+      IDEMPOTENCY_TABLE  = aws_dynamodb_table.idempotency.name
+      RATE_LIMIT_TABLE   = aws_dynamodb_table.rate_limiter.name
+      TARGET_TPS         = tostring(var.sfn_target_tps)
+      ENABLE_IDEMPOTENCY = tostring(var.enable_idempotency)
+      BACKEND_FUNCTION   = aws_lambda_function.stub.function_name
+      MAX_RETRIES        = tostring(var.max_retries)
     }
   }
 }
@@ -116,8 +117,9 @@ resource "aws_cloudwatch_log_group" "sfn" {
 
 locals {
   sfn_definition = jsonencode({
-    Comment = "PoC Bre-B — Ejecución de pagos programados con Map distribuido"
-    StartAt = "GenerarDataset"
+    Comment        = "PoC Bre-B — Ejecución de pagos programados con Map distribuido"
+    TimeoutSeconds = var.sfn_window_seconds # ASR: nunca más de 60 min
+    StartAt        = "GenerarDataset"
     States = {
       # 1) Controller: consulta/genera el dataset del día en S3.
       GenerarDataset = {
@@ -158,7 +160,9 @@ locals {
               # Reintentos de la propia máquina de estados ante fallos transitorios
               # del worker/core (además del backoff interno del worker).
               Retry = [{
-                ErrorEquals     = ["States.TaskFailed", "Lambda.TooManyRequestsException", "Lambda.ServiceException"]
+                # Sin idempotencia solo se reintentan errores de servicio que ocurren ANTES de que
+                # el worker ejecute pagos; un reintento por TaskFailed/timeout repetiria un lote.
+                ErrorEquals     = var.enable_idempotency ? ["States.TaskFailed", "Lambda.TooManyRequestsException", "Lambda.ServiceException"] : ["Lambda.TooManyRequestsException", "Lambda.ServiceException", "Lambda.SdkClientException"]
                 IntervalSeconds = 1
                 MaxAttempts     = 3
                 BackoffRate     = 2.0

@@ -62,3 +62,8 @@ output "state_machine_console_url" {
   description = "Consola de Step Functions (historia de ejecuciones = evidencia en AWS)."
   value       = "https://${var.aws_region}.console.aws.amazon.com/states/home?region=${var.aws_region}#/statemachines/view/${aws_sfn_state_machine.pagos.arn}"
 }
+
+output "sfn_dashboard_url" {
+  description = "Dashboard con el grafico tipo k6 (TPS hacia el core y tiempo de respuesta)."
+  value       = "https://${var.aws_region}.console.aws.amazon.com/cloudwatch/home?region=${var.aws_region}#dashboards:name=${aws_cloudwatch_dashboard.sfn.dashboard_name}"
+}

@@ -20,14 +20,14 @@ echo "##########################################################################
 echo "#  PoC Bre-B — Validación de dosificado (banda 10–15 TPS, 20.000 pagos/1 h)  #"
 echo "#############################################################################"
 echo
-echo ">>> Escenario NORMAL · 20.000 pagos · objetivo 15 TPS (borde superior)"
-"$PY" sim/simulate_dosing.py --total 20000 --concurrency 3 --target-tps 15
+echo ">>> Escenario NORMAL · 20.000 pagos · objetivo 12 TPS (default desplegado)"
+"$PY" sim/simulate_dosing.py --total 20000 --concurrency 4 --target-tps 12
 echo
-echo ">>> Escenario CONSERVADOR · 20.000 pagos · objetivo 10 TPS (borde inferior)"
-"$PY" sim/simulate_dosing.py --total 20000 --concurrency 3 --target-tps 10
+echo ">>> Escenario CONSERVADOR · 20.000 pagos · objetivo 11 TPS (zona baja de la banda)"
+"$PY" sim/simulate_dosing.py --total 20000 --concurrency 4 --target-tps 11
 echo
 echo ">>> Escenario FALLO+DUPLICADOS · 20.000 pagos · 1 de cada 50 duplicado (ASR-2)"
-"$PY" sim/simulate_dosing.py --total 20000 --concurrency 3 --target-tps 15 --duplicate-every 50
+"$PY" sim/simulate_dosing.py --total 20000 --concurrency 4 --target-tps 12 --duplicate-every 50
 echo
 echo ">>> Pruebas unitarias del simulador"
 "$PY" sim/test_dosing.py

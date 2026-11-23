@@ -28,7 +28,30 @@ aws stepfunctions list-executions --region "$REGION" \
   --output table
 
 echo
+echo "== Ventana del ASR: 20.000 pagos en <= 60 min a 10-15 TPS =="
+EXEC_ARN=$(aws stepfunctions list-executions --region "$REGION" --state-machine-arn "$SM_ARN" \
+  --max-results 1 --query 'executions[0].executionArn' --output text)
+read -r ST START STOP < <(aws stepfunctions describe-execution --region "$REGION" --execution-arn "$EXEC_ARN" \
+  --query '[status,startDate,stopDate]' --output text)
+echo "estado: $ST"
+if [[ "$ST" == "SUCCEEDED" ]]; then
+  python3 - "$START" "$STOP" <<'PY'
+import sys
+total = 20000
+start, stop = float(sys.argv[1]), float(sys.argv[2])
+dur = stop - start
+tps = total / dur
+print(f"duracion: {dur/60:.1f} min  |  TPS promedio: {tps:.1f}")
+print("ASR ventana (<= 60 min):", "OK" if dur <= 3600 else "INCUMPLIDO")
+print("ASR banda 10-15 TPS   :", "OK" if 10 <= tps <= 15 else "REVISAR (TOTAL distinto de 20000 o ritmo fuera de banda)")
+PY
+elif [[ "$ST" == "TIMED_OUT" ]]; then
+  echo "ASR ventana: INCUMPLIDO (la ejecucion supero los 60 min y fue cortada)"
+fi
+
+echo
 echo "== Pagos únicos ejecutados (idempotencia, ASR-2) =="
+echo "(La PoC corre con enable_idempotency=false por defecto: la tabla estara vacia. Esto es esperado.)"
 COUNT=$(aws dynamodb scan --table-name "$TABLE" --region "$REGION" \
   --select COUNT --query 'Count' --output text)
 echo "payment_key únicos en DynamoDB: $COUNT"
