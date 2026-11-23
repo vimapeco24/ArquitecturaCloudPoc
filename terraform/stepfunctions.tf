@@ -136,7 +136,15 @@ locals {
           "run_id.$" = "$.Payload.run_id"
         }
         ResultPath = "$.dataset"
-        Next       = "ProcesarPagos"
+        # El controller es seguro de repetir (reescribe el mismo objeto S3). Tolera 429/5xx
+        # transitorios de Lambda en cuentas sandbox con poca cuota.
+        Retry = [{
+          ErrorEquals     = ["Lambda.TooManyRequestsException", "Lambda.ServiceException", "Lambda.SdkClientException", "Lambda.AWSLambdaException"]
+          IntervalSeconds = 5
+          MaxAttempts     = 6
+          BackoffRate     = 2.0
+        }]
+        Next = "ProcesarPagos"
       }
 
       # 2) Map DISTRIBUIDO: itera el dataset en paralelo contra el core.
