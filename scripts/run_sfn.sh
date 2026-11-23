@@ -36,6 +36,17 @@ echo "total pagos:     $TOTAL"
 echo "duplicate_every: $DUP"
 echo
 
+# Una sola corrida a la vez: la cuenta sandbox tiene 10 de concurrencia Lambda y
+# cada corrida usa ~8 (4 workers + 4 invocaciones del core). Dos corridas = 429.
+RUNNING=$(aws stepfunctions list-executions --region "$REGION" --state-machine-arn "$SM_ARN" \
+  --status-filter RUNNING --query 'executions[].name' --output text)
+if [[ -n "$RUNNING" && "$RUNNING" != "None" ]]; then
+  echo "❌ Ya hay ejecuciones en curso: $RUNNING"
+  echo "   Detenlas antes de lanzar otra (consumen la concurrencia Lambda y causan 429):"
+  echo "   ./scripts/stop_sfn.sh"
+  exit 1
+fi
+
 INPUT=$(printf '{"total":%s,"run_id":"%s","duplicate_every":%s}' "$TOTAL" "$RUN_ID" "$DUP")
 
 EXEC_ARN=$(aws stepfunctions start-execution \
